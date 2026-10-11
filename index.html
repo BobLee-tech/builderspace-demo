@@ -1,0 +1,2467 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="BuilderSpace：从 UNSW 起步的中英双语创客社团。带着想法来，两小时做出第一个能用的页面。">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#050505">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>BuilderSpace 官网原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;600;800&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap">
+<!-- 资源包：WebGL 渲染 / 时间轴动画 / 滚动驱动 / 惯性滚动 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<!-- v4：筛选布局动画 / 代码高亮 / 真实二维码 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/Flip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+</head>
+<body>
+<style>
+/* Layout: 12-col blueprint grid on pure black; hairline rules + mono coordinates; mobile-first with bottom dock */
+:root{
+  --ink:#050505;        /* page ground */
+  --panel:#0c0c0d;      /* raised surface */
+  --line:#232325;       /* hairline */
+  --line-2:#3a3a3d;     /* strong hairline */
+  --mute:#8a8a90;       /* secondary text */
+  --paper:#f4f4f2;      /* primary text / inverse fill */
+  --signal:#ffffff;     /* live state */
+  --f-display:"Unbounded","Noto Sans SC",system-ui,sans-serif;
+  --f-body:"Geist","Noto Sans SC",system-ui,sans-serif;
+  --f-mono:"Geist Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --gut:clamp(16px,4vw,48px);
+  --max:1240px;
+  --ease:cubic-bezier(.2,.7,.1,1);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+.lenis.lenis-stopped{overflow:hidden}
+body{background:var(--ink);color:var(--paper);font-family:var(--f-body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+::selection{background:var(--paper);color:var(--ink)}
+a{color:inherit;text-decoration:none}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:1px solid var(--paper);outline-offset:3px}
+.mono{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.mute{color:var(--mute)}
+.wrap{max-width:var(--max);margin:0 auto;padding-inline:var(--gut)}
+h1,h2,h3{text-wrap:balance;margin:0}
+p{margin:0}
+
+/* ---------- noise + grid backdrop ---------- */
+.backdrop{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:80px 80px;opacity:.35;mask-image:radial-gradient(ellipse at 50% 0%,#000 30%,transparent 75%)}
+.grain{position:fixed;inset:-50%;pointer-events:none;z-index:60;opacity:.06;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation:grain 1.2s steps(6) infinite}
+@keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-1%)}100%{transform:translate(0,0)}}
+main{position:relative;z-index:1}
+
+/* ---------- top bar ---------- */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px);
+  background:color-mix(in srgb,var(--ink) 72%,transparent);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:24px;height:60px}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:800;font-size:15px;letter-spacing:-.01em}
+.logo-mark{width:22px;height:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+.logo-mark i{background:var(--paper);border-radius:1px;transition:transform .4s var(--ease),opacity .4s}
+.logo-mark i:nth-child(2),.logo-mark i:nth-child(4),.logo-mark i:nth-child(9){opacity:.25}
+.logo:hover .logo-mark i{transform:scale(.6)}
+.nav{display:flex;gap:4px;margin-left:auto}
+.nav a{position:relative;padding:8px 12px;font-size:13px;color:var(--mute);border-radius:999px;transition:color .2s}
+.nav a:hover{color:var(--paper)}
+.nav a.on{color:var(--ink);background:var(--paper)}
+.lang{display:flex;border:1px solid var(--line-2);border-radius:999px;overflow:hidden}
+.lang button{background:none;border:0;padding:5px 10px;font-family:var(--f-mono);font-size:11px;color:var(--mute);cursor:pointer}
+.lang button.on{background:var(--paper);color:var(--ink)}
+
+/* ---------- buttons ---------- */
+.btn{--h:46px;display:inline-flex;align-items:center;gap:10px;height:var(--h);padding:0 22px;border-radius:999px;border:1px solid var(--paper);
+  font-weight:600;font-size:14px;cursor:pointer;position:relative;overflow:hidden;isolation:isolate;transition:color .35s var(--ease)}
+.btn::before{content:"";position:absolute;inset:0;background:var(--paper);z-index:-1;transform:translateY(0);transition:transform .45s var(--ease)}
+.btn.solid{color:var(--ink);background:none}
+.btn.solid:hover{color:var(--paper)}
+.btn.solid:hover::before{transform:translateY(101%)}
+.btn.ghost{background:none;color:var(--paper);border-color:var(--line-2)}
+.btn.ghost::before{transform:translateY(101%)}
+.btn.ghost:hover{color:var(--ink);border-color:var(--paper)}
+.btn.ghost:hover::before{transform:translateY(0)}
+.btn .arr{transition:transform .35s var(--ease)}
+.btn:hover .arr{transform:translateX(4px)}
+
+/* ---------- route transitions ---------- */
+.view{display:none}
+.view.on{display:block;animation:viewIn .7s var(--ease)}
+@keyframes viewIn{from{opacity:.0;transform:translateY(14px);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
+.stagger>*{animation:rise .8s var(--ease) both}
+.stagger>*:nth-child(2){animation-delay:.06s}.stagger>*:nth-child(3){animation-delay:.12s}
+.stagger>*:nth-child(4){animation-delay:.18s}.stagger>*:nth-child(5){animation-delay:.24s}.stagger>*:nth-child(6){animation-delay:.3s}
+@keyframes rise{from{opacity:.0;transform:translateY(18px)}to{opacity:1;transform:none}}
+
+/* ---------- section scaffolding ---------- */
+.sec{padding-block:clamp(56px,9vw,120px);border-top:1px solid var(--line);position:relative}
+.sec-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 40px;align-items:end;margin-bottom:40px}
+.eyebrow{display:flex;align-items:center;gap:10px;color:var(--mute);margin-bottom:16px}
+.eyebrow::before{content:"";width:6px;height:6px;background:var(--paper);display:inline-block}
+.h2{font-family:var(--f-display);font-weight:600;font-size:clamp(26px,4.2vw,52px);line-height:1.08;letter-spacing:-.02em}
+.h2 .dim{color:var(--mute)}
+.lede{max-width:56ch;color:var(--mute);font-size:16px}
+
+/* ---------- hero ---------- */
+.hero{position:relative;padding-block:clamp(40px,8vw,96px) clamp(40px,6vw,72px);overflow:hidden}
+#field{position:absolute;inset:0;width:100%;height:100%;z-index:0;opacity:.9}
+.hero .wrap{position:relative;z-index:1}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px 24px;margin-bottom:clamp(28px,5vw,56px)}
+.live{display:inline-flex;align-items:center;gap:8px}
+.live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--signal);box-shadow:0 0 0 0 var(--signal);animation:ping 1.8s infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(255,255,255,.6)}80%,100%{box-shadow:0 0 0 10px rgba(255,255,255,0)}}
+.display{font-family:var(--f-display);font-weight:800;font-size:clamp(40px,9.6vw,132px);line-height:.94;letter-spacing:-.045em;margin:0}
+.display .line{display:block;overflow:hidden}
+.display .line>span{display:inline-block;animation:slideUp 1s var(--ease) both}
+.display .line:nth-child(2)>span{animation-delay:.08s}
+.display .line:nth-child(3)>span{animation-delay:.16s}
+@keyframes slideUp{from{transform:translateY(105%)}to{transform:none}}
+.display .outline{color:transparent;-webkit-text-stroke:1.2px var(--paper)}
+.hero-sub{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:32px;margin-top:clamp(28px,4vw,48px);align-items:end}
+.hero-zh{font-size:clamp(18px,2.2vw,24px);font-weight:500;line-height:1.5;max-width:22em}
+.hero-zh b{font-weight:900;background:linear-gradient(transparent 62%,rgba(255,255,255,.22) 0)}
+.hero-cta{display:flex;flex-wrap:wrap;gap:12px;justify-content:flex-end}
+.cursor{display:inline-block;width:.55em;height:.9em;background:var(--paper);vertical-align:-.08em;margin-left:.08em;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ticker */
+.ticker{border-block:1px solid var(--line);overflow:hidden;white-space:nowrap;position:relative;z-index:1;background:var(--ink)}
+.ticker-track{display:inline-flex;gap:48px;padding-block:14px;animation:marquee 38s linear infinite}
+.ticker:hover .ticker-track{animation-play-state:paused}
+.ticker span{display:inline-flex;align-items:center;gap:48px}
+.ticker span::after{content:"✕";color:var(--line-2);font-size:10px}
+@keyframes marquee{to{transform:translateX(-50%)}}
+
+/* ---------- next event card ---------- */
+.next{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);border:1px solid var(--line-2);border-radius:20px;overflow:hidden;background:var(--panel)}
+.next-l{padding:clamp(22px,3.5vw,40px);display:flex;flex-direction:column;gap:22px}
+.next-r{border-left:1px solid var(--line);display:grid;grid-template-rows:1fr auto}
+.tag{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border:1px solid var(--line-2);border-radius:999px;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--paper);white-space:nowrap}
+.tag.fill{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+.tag.dash{border-style:dashed;color:var(--mute)}
+.kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line)}
+.kv>div{padding:16px 0;display:flex;flex-direction:column;gap:4px}
+.kv>div+div{padding-left:16px;border-left:1px solid var(--line)}
+.kv b{font-weight:500;font-size:15px}
+.countdown{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line)}
+.countdown div{padding:clamp(18px,3vw,30px) 8px;text-align:center;border-right:1px solid var(--line)}
+.countdown div:last-child{border-right:0}
+.countdown b{display:block;font-family:var(--f-display);font-weight:600;font-size:clamp(28px,4vw,46px);font-variant-numeric:tabular-nums;letter-spacing:-.03em;line-height:1}
+.agenda{padding:20px clamp(18px,3vw,30px);display:flex;flex-direction:column;gap:10px;font-size:13px}
+.agenda li{display:grid;grid-template-columns:64px 1fr;gap:12px;list-style:none;color:var(--mute)}
+.agenda li span:first-child{font-family:var(--f-mono);color:var(--paper)}
+.agenda ul{margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+
+/* ---------- pillars (3 selling points) ---------- */
+.pillars{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.pillar{padding:clamp(22px,3vw,36px);min-height:260px;display:flex;flex-direction:column;gap:14px;position:relative;transition:background .4s var(--ease)}
+.pillar+.pillar{border-left:1px solid var(--line)}
+.pillar:hover{background:var(--paper);color:var(--ink)}
+.pillar:hover .mute{color:#55555a}
+.pillar .glyph{font-family:var(--f-mono);font-size:44px;line-height:1;margin-bottom:auto;letter-spacing:-.05em}
+.pillar h3{font-size:20px;font-weight:700}
+
+/* ---------- build cycle ---------- */
+.cycle{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+.cycle-rail{position:absolute;left:0;right:0;top:27px;height:1px;background:var(--line-2)}
+.cycle-rail i{position:absolute;inset:0;background:var(--paper);transform-origin:left;transform:scaleX(.42);transition:transform 1.4s var(--ease)}
+.step{position:relative;padding-right:24px;cursor:default}
+.node{width:55px;height:55px;border-radius:50%;border:1px solid var(--line-2);background:var(--ink);display:grid;place-items:center;font-family:var(--f-mono);font-size:12px;position:relative;z-index:1;transition:all .4s var(--ease)}
+.step.done .node{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+.step.now .node{border-color:var(--paper)}
+.step.now .node::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:1px dashed var(--paper);animation:spin 10s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.step h3{font-size:18px;font-weight:700;margin-top:22px}
+.step p{color:var(--mute);font-size:13.5px;margin-top:6px}
+.step .mono{margin-top:14px;display:block;color:var(--mute)}
+
+/* ---------- metrics ---------- */
+.metrics{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.metric{padding:clamp(20px,2.6vw,30px);display:flex;flex-direction:column;gap:10px;min-width:0}
+.metric+.metric{border-left:1px solid var(--line)}
+.metric.star{background:var(--paper);color:var(--ink)}
+.metric.star .mute{color:#5a5a5f}
+.big{font-family:var(--f-display);font-weight:600;font-size:clamp(38px,5.6vw,76px);line-height:1;letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+.big sup{font-size:.32em;letter-spacing:0;vertical-align:top;margin-left:4px;font-family:var(--f-mono);font-weight:400}
+.spark{width:100%;height:46px;margin-top:auto}
+.bar{height:4px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:auto}
+.bar i{display:block;height:100%;background:var(--paper);border-radius:4px;width:0;transition:width 1.6s var(--ease)}
+.metric.star .bar{background:rgba(0,0,0,.12)}.metric.star .bar i{background:var(--ink)}
+</style>
+<style>
+/* ---------- project cards ---------- */
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.filters .label{margin-right:6px}
+.chip{height:34px;padding:0 14px;border-radius:999px;border:1px solid var(--line-2);background:none;font-size:13px;color:var(--mute);cursor:pointer;transition:all .25s var(--ease);display:inline-flex;align-items:center;gap:8px}
+.chip:hover{color:var(--paper);border-color:var(--paper)}
+.chip.on{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+.chip .n{font-family:var(--f-mono);font-size:10px;opacity:.6}
+.grid-p{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:28px}
+.pcard{--mx:50%;--my:50%;position:relative;border:1px solid var(--line);border-radius:18px;background:var(--panel);padding:22px;display:flex;flex-direction:column;gap:16px;min-height:300px;cursor:pointer;overflow:hidden;transition:transform .5s var(--ease),border-color .3s}
+.pcard::before{content:"";position:absolute;inset:0;background:radial-gradient(360px circle at var(--mx) var(--my),rgba(255,255,255,.09),transparent 45%);opacity:0;transition:opacity .3s}
+.pcard:hover{border-color:var(--line-2);transform:translateY(-4px)}
+.pcard:hover::before{opacity:1}
+.pcard.hide{display:none}
+.pcard-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pcard h3{font-family:var(--f-display);font-size:20px;font-weight:600;letter-spacing:-.02em;line-height:1.2}
+.pcard .prob{color:var(--mute);font-size:13.5px}
+.need{display:flex;flex-wrap:wrap;gap:6px}
+.prog{display:flex;gap:3px;margin-top:auto}
+.prog i{flex:1;height:18px;border:1px solid var(--line-2);border-radius:3px}
+.prog i.f{background:var(--paper);border-color:var(--paper)}
+.pcard-foot{display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px dashed var(--line);font-size:12.5px;color:var(--mute)}
+.avatar{display:inline-flex}
+.avatar b{width:24px;height:24px;border-radius:50%;background:var(--paper);color:var(--ink);font-size:10px;display:grid;place-items:center;border:2px solid var(--panel);margin-left:-6px;font-family:var(--f-mono)}
+.avatar b:first-child{margin-left:0}
+.avatar b.o{background:var(--ink);color:var(--paper);border-color:var(--line-2)}
+.st-dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.st-recruit{background:var(--paper);box-shadow:0 0 10px var(--paper)}
+.st-build{background:none;border:1.5px solid var(--paper)}
+.st-demo{background:repeating-linear-gradient(45deg,var(--paper) 0 2px,transparent 2px 4px);border:1px solid var(--paper)}
+.st-pause{background:var(--line-2)}
+
+/* ---------- events list ---------- */
+.ev-list{border-top:1px solid var(--line)}
+.ev{display:grid;grid-template-columns:120px minmax(0,1fr) 200px 150px;gap:24px;align-items:center;padding:26px 0;border-bottom:1px solid var(--line);position:relative;transition:padding .4s var(--ease)}
+.ev::before{content:"";position:absolute;left:0;top:0;bottom:0;width:0;background:var(--paper);transition:width .5s var(--ease);z-index:-1}
+.ev:hover{padding-left:20px;color:var(--ink)}
+.ev:hover::before{width:100%}
+.ev:hover .mute{color:#55555a}
+.ev:hover .tag{border-color:var(--ink);color:var(--ink)}
+.ev-date{font-family:var(--f-display);font-weight:600;font-size:30px;letter-spacing:-.04em;line-height:1}
+.ev-date small{display:block;font-family:var(--f-mono);font-size:11px;font-weight:400;letter-spacing:.08em;margin-top:6px}
+.ev h3{font-size:19px;font-weight:600}
+.ev.past{opacity:.5}
+.cal-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:28px 0 8px;padding:16px 20px;border:1px dashed var(--line-2);border-radius:14px}
+.code{font-family:var(--f-mono);font-size:12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;overflow-x:auto;white-space:nowrap;max-width:100%}
+
+/* exam-calendar strip */
+.weeks{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:28px}
+.wk{padding:14px 10px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:6px;min-height:118px;position:relative}
+.wk:last-child{border-right:0}
+.wk.off{background:repeating-linear-gradient(-45deg,transparent 0 6px,rgba(255,255,255,.05) 6px 7px)}
+.wk.now{background:var(--paper);color:var(--ink)}
+.wk.now .mute{color:#55555a}
+.wk b{font-family:var(--f-display);font-size:18px;font-weight:600}
+.wk .pill{margin-top:auto;font-size:11.5px;line-height:1.35}
+
+/* ---------- project detail ---------- */
+.detail{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:40px}
+.dhead h1{font-family:var(--f-display);font-weight:800;font-size:clamp(34px,6vw,72px);letter-spacing:-.045em;line-height:1}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-top:32px}
+.fields>div{background:var(--ink);padding:20px;display:flex;flex-direction:column;gap:8px}
+.tl{position:relative;margin-top:32px;padding-left:28px}
+.tl::before{content:"";position:absolute;left:6px;top:6px;bottom:6px;width:1px;background:var(--line-2)}
+.tl-item{position:relative;padding-bottom:28px}
+.tl-item::before{content:"";position:absolute;left:-27px;top:6px;width:13px;height:13px;border-radius:50%;background:var(--ink);border:1px solid var(--paper)}
+.tl-item.k::before{background:var(--paper)}
+.tl-item h4{margin:4px 0 6px;font-size:16px;font-weight:600}
+.tl-item p{color:var(--mute);font-size:14px}
+.commit{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.side{display:flex;flex-direction:column;gap:16px;position:sticky;top:84px;align-self:start}
+.box{border:1px solid var(--line);border-radius:16px;padding:20px;background:var(--panel);display:flex;flex-direction:column;gap:14px}
+.heat{display:grid;grid-template-columns:repeat(14,1fr);gap:3px}
+.heat i{aspect-ratio:1;border-radius:2px;background:var(--line);max-width:100%}
+.heat i.l1{background:#4a4a4e}.heat i.l2{background:#9a9aa0}.heat i.l3{background:var(--paper)}
+
+/* ---------- learn ---------- */
+.learn{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.lcard{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--panel);display:flex;flex-direction:column}
+.term{background:#000;border-bottom:1px solid var(--line);padding:16px 18px;font-family:var(--f-mono);font-size:12.5px;line-height:1.75;min-height:170px;color:#cfcfd2;overflow-x:auto}
+.term .c{color:var(--mute)}
+.term .ok{color:var(--paper);font-weight:500}
+.dots{display:flex;gap:6px;margin-bottom:12px}.dots i{width:9px;height:9px;border-radius:50%;border:1px solid var(--line-2)}
+.lcard .body{padding:20px;display:flex;flex-direction:column;gap:10px;flex:1}
+.lcard .links{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:8px}
+.digest{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border-top:1px solid var(--line)}
+.digest article{padding:22px 22px 22px 0;display:flex;flex-direction:column;gap:8px}
+.digest article+article{padding-left:22px;border-left:1px solid var(--line)}
+.digest h4{margin:0;font-size:16px;font-weight:600;line-height:1.4}
+.perk{display:grid;grid-template-columns:70px minmax(0,1fr) auto;gap:16px;align-items:center;padding:18px 0;border-bottom:1px solid var(--line)}
+.perk .lv{font-family:var(--f-display);font-weight:600;font-size:22px}
+
+/* ---------- join ---------- */
+.join{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:clamp(24px,5vw,72px)}
+.form{border:1px solid var(--line-2);border-radius:20px;padding:clamp(20px,3vw,32px);background:var(--panel);display:flex;flex-direction:column;gap:20px}
+.stepper{display:flex;gap:6px}
+.stepper i{flex:1;height:3px;background:var(--line);border-radius:3px;overflow:hidden;position:relative}
+.stepper i.on::after{content:"";position:absolute;inset:0;background:var(--paper);animation:fill .6s var(--ease) both}
+@keyframes fill{from{transform:scaleX(0);transform-origin:left}to{transform:none}}
+.fld{display:flex;flex-direction:column;gap:8px}
+.fld label{font-size:13px;color:var(--mute)}
+.inp{height:48px;border:0;border-bottom:1px solid var(--line-2);background:transparent;padding:0 2px;font-size:16px;transition:border-color .3s}
+.inp:focus{outline:none;border-color:var(--paper)}
+textarea.inp{height:84px;padding-top:12px;resize:vertical}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.consent{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--mute)}
+.consent input{accent-color:#fff;margin-top:4px}
+.done{display:flex;flex-direction:column;align-items:center;text-align:center;gap:16px;padding:20px 0}
+.qr{width:180px;height:180px;background:var(--paper);border-radius:14px;padding:12px}
+.qr canvas{width:100%;height:100%;image-rendering:pixelated;display:block}
+.facts{display:flex;flex-direction:column;gap:0;margin-top:28px;border-top:1px solid var(--line)}
+.facts div{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);font-size:14px}
+
+/* ---------- spec ---------- */
+.spec-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.sw{border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.sw div{height:90px}
+.sw p{padding:12px;font-size:12px;display:flex;flex-direction:column;gap:2px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:720px}
+th,td{text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:400;background:var(--panel)}
+tr:last-child td{border-bottom:0}
+.motion{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.mbox{border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:10px;min-height:200px}
+.demo-stage{height:70px;border:1px dashed var(--line-2);border-radius:10px;display:grid;place-items:center;overflow:hidden;margin-top:auto}
+
+/* ---------- footer + dock ---------- */
+footer{border-top:1px solid var(--line);padding-block:48px 120px;position:relative;z-index:1}
+.foot{display:grid;grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr));gap:24px}
+.foot h4{margin:0 0 12px;font-weight:400}
+.foot a{display:block;color:var(--mute);font-size:14px;padding:3px 0}
+.foot a:hover{color:var(--paper)}
+.giant{font-family:var(--f-display);font-weight:800;font-size:clamp(48px,14vw,200px);letter-spacing:-.06em;line-height:.85;margin-top:48px;color:transparent;-webkit-text-stroke:1px var(--line-2);white-space:nowrap;overflow:hidden}
+.dock{display:none}
+.xy{position:fixed;right:16px;bottom:16px;z-index:40;color:var(--mute);pointer-events:none;font-variant-numeric:tabular-nums}
+
+/* ---------- responsive ---------- */
+@media (max-width:980px){
+  .grid-p{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .metrics{grid-template-columns:1fr 1fr}
+  .metric:nth-child(3){border-left:0}
+  .metric:nth-child(n+3){border-top:1px solid var(--line)}
+  .detail{grid-template-columns:1fr}
+  .side{position:static}
+  .ev{grid-template-columns:90px minmax(0,1fr) 140px}
+  .ev .ev-cta{display:none}
+  .spec-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:720px){
+  body{font-size:14.5px}
+  .nav,.top .btn{display:none}
+  .lang{margin-left:auto}
+  .hero-sub,.next,.join,.learn{grid-template-columns:1fr}
+  .hero-cta{justify-content:flex-start}
+  .next-r{border-left:0;border-top:1px solid var(--line)}
+  .pillars{grid-template-columns:1fr}
+  .pillar{min-height:auto}
+  .pillar+.pillar{border-left:0;border-top:1px solid var(--line)}
+  .pillar .glyph{margin-bottom:16px}
+  .cycle{grid-template-columns:1fr;gap:28px}
+  .cycle-rail{left:27px;right:auto;top:0;bottom:0;width:1px;height:auto}
+  .cycle-rail i{transform-origin:top;transform:scaleY(.42)}
+  .step{display:grid;grid-template-columns:55px 1fr;gap:0 18px}
+  .step h3{margin-top:4px}
+  .step>*:not(.node){grid-column:2}
+  .step .node{grid-row:span 3}
+  .grid-p{grid-template-columns:1fr}
+  .metrics{grid-template-columns:1fr 1fr}
+  .metric.star{grid-column:1/-1}
+  .metric:nth-child(2){border-left:0;border-top:1px solid var(--line)}
+  .metric:nth-child(3){border-left:1px solid var(--line)}
+  .metric:nth-child(4){border-left:0}
+  .ev{grid-template-columns:64px minmax(0,1fr);gap:14px}
+  .ev .ev-where{grid-column:2}
+  .ev-date{font-size:24px}
+  .weeks{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .wk:nth-child(4){border-right:0}
+  .wk:nth-child(-n+4){border-bottom:1px solid var(--line)}
+  .fields,.row2,.digest,.motion{grid-template-columns:1fr}
+  .digest article+article{padding-left:0;border-left:0;border-top:1px solid var(--line)}
+  .foot{grid-template-columns:1fr 1fr}
+  .foot>div:first-child{grid-column:1/-1}
+  .sec-head{grid-template-columns:1fr}
+  .kv{grid-template-columns:1fr 1fr}
+  .kv>div:nth-child(3){grid-column:1/-1;border-left:0;padding-left:0;border-top:1px solid var(--line)}
+  .xy{display:none}
+  .dock{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:55;
+    background:color-mix(in srgb,var(--panel) 82%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--line-2);border-radius:20px;padding:6px}
+  .dock a{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;border-radius:14px;font-size:10.5px;color:var(--mute)}
+  .dock a svg{width:20px;height:20px}
+  .dock a.on{background:var(--paper);color:var(--ink)}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .grain{display:none}
+}
+</style>
+
+<style>
+/* =====================================================================
+   MATERIAL PACK v2 · 程序化材质（全部内联，无外部图片）
+   ===================================================================== */
+:root{
+  --mat-noise:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  --mat-scan:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px);
+  --mat-halftone:radial-gradient(circle at center,rgba(255,255,255,.16) 0 1px,transparent 1.5px);
+  --mat-brushed:repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 2px,rgba(255,255,255,.015) 2px 3px,transparent 3px 5px);
+  --mat-chrome:linear-gradient(180deg,#ffffff 0%,#d9d9d6 22%,#5e5e62 46%,#0f0f10 50%,#8d8d92 58%,#f4f4f2 78%,#a7a7ab 100%);
+  --mat-glass:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.012) 40%,rgba(255,255,255,.02));
+  --edge:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,.06) 30%,rgba(255,255,255,.02) 70%,rgba(255,255,255,.12));
+}
+
+/* blueprint grid with + markers at intersections */
+.backdrop{background-size:120px 120px;opacity:.28}
+.marks{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><path d='M-4.5 0H4.5M0-4.5V4.5M115.5 0h9M120-4.5v9M-4.5 120h9M0 115.5v9M115.5 120h9M120 115.5v9' stroke='%23707075' stroke-width='1'/></svg>");
+  background-size:120px 120px;mask-image:radial-gradient(ellipse at 50% 10%,#000 20%,transparent 70%);-webkit-mask-image:radial-gradient(ellipse at 50% 10%,#000 20%,transparent 70%)}
+.grain{inset:0;animation:none;background-image:var(--mat-noise);background-size:220px;opacity:.05}
+.vignette{position:fixed;inset:0;pointer-events:none;z-index:59;background:radial-gradient(120% 90% at 50% 40%,transparent 55%,rgba(0,0,0,.55))}
+
+/* glass surfaces with gradient hairline edge */
+.next,.pcard,.metric,.box,.lcard,.form,.mbox,.sw,.pillars,.metrics,.weeks,.tbl-wrap{position:relative}
+.glass,.next,.pcard,.box,.lcard,.form{background:var(--mat-glass),var(--panel);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 30px 60px -30px rgba(0,0,0,.9)}
+.next::after,.pcard::after,.box::after,.lcard::after,.form::after,.metrics::after,.pillars::after{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
+  background:var(--edge);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.next,.pcard,.box,.lcard,.form{border-color:transparent}
+.pcard{background-image:var(--mat-glass),var(--mat-halftone);background-size:auto,6px 6px;background-color:var(--panel)}
+
+/* HUD corner brackets */
+.hud{position:relative}
+.hud>.c{position:absolute;width:12px;height:12px;border-color:var(--paper);border-style:solid;opacity:.7;pointer-events:none;transition:all .5s var(--ease)}
+.hud>.c.tl{top:-1px;left:-1px;border-width:1px 0 0 1px}.hud>.c.tr{top:-1px;right:-1px;border-width:1px 1px 0 0}
+.hud>.c.bl{bottom:-1px;left:-1px;border-width:0 0 1px 1px}.hud>.c.br{bottom:-1px;right:-1px;border-width:0 1px 1px 0}
+.hud:hover>.c{width:22px;height:22px;opacity:1}
+
+/* chrome type */
+.chrome{background:var(--mat-chrome);background-size:100% 220%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:chromeShift 2.6s cubic-bezier(.2,.7,.1,1) .4s both}
+@keyframes chromeShift{from{background-position:0 0}to{background-position:0 100%}}
+.display .outline{-webkit-text-stroke:1px rgba(244,244,242,.75)}
+
+/* hero upgrade */
+.hero{min-height:min(860px,100svh);display:flex;align-items:center;border-bottom:1px solid var(--line)}
+.hero .wrap{width:100%}
+#gl{position:absolute;inset:0;width:100%;height:100%;z-index:0;image-rendering:pixelated;display:block}
+.hero::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background:var(--mat-scan);opacity:.7}
+.hero::before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,var(--ink) 0%,rgba(5,5,5,.75) 32%,transparent 62%),linear-gradient(0deg,var(--ink),transparent 30%)}
+.hero .wrap{z-index:2}
+.readout{position:absolute;z-index:2;display:flex;flex-direction:column;gap:4px;color:var(--mute);font-variant-numeric:tabular-nums}
+.readout b{color:var(--paper);font-weight:500}
+.readout.tr{top:24px;right:var(--gut);text-align:right}
+.readout.br{bottom:24px;right:var(--gut);text-align:right;align-items:flex-end}
+.rmode{display:flex;border:1px solid var(--line-2);border-radius:999px;overflow:hidden;margin-top:6px;pointer-events:auto}
+.rmode button{background:rgba(5,5,5,.6);border:0;padding:5px 10px;font:inherit;color:var(--mute);cursor:pointer;letter-spacing:.08em}
+.rmode button.on{background:var(--paper);color:var(--ink)}
+.scrollcue{position:absolute;left:var(--gut);bottom:24px;z-index:2;display:flex;align-items:center;gap:12px;color:var(--mute)}
+.scrollcue i{width:1px;height:38px;background:var(--line-2);position:relative;overflow:hidden}
+.scrollcue i::after{content:"";position:absolute;left:0;top:-40%;width:1px;height:40%;background:var(--paper);animation:cue 1.8s var(--ease) infinite}
+@keyframes cue{to{top:100%}}
+
+/* section index (desktop) */
+.sec-idx{position:absolute;top:clamp(56px,9vw,120px);right:var(--gut);color:var(--line-2);font-family:var(--f-display);font-weight:300;font-size:13px;letter-spacing:.1em}
+
+/* buttons: metallic sheen */
+.btn.solid::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.85) 50%,transparent 65%);transform:translateX(-120%);z-index:-1;mix-blend-mode:overlay}
+.btn.solid:not(:hover)::after{animation:sheen 4.5s ease-in-out infinite}
+@keyframes sheen{0%,70%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+
+/* metrics + star tile material */
+.metric.star{background:var(--mat-brushed),linear-gradient(160deg,#ffffff,#d6d6d3 55%,#bdbdba);color:var(--ink)}
+.metric{background:var(--mat-glass)}
+
+/* pillars with large index + scanline hover */
+.pillar{overflow:hidden}
+.pillar::after{content:"";position:absolute;inset:0;background:var(--mat-scan);opacity:0;transition:opacity .4s}
+.pillar:hover::after{opacity:1}
+
+/* custom cursor */
+.cur,.cur-ring{position:fixed;left:0;top:0;pointer-events:none;z-index:100;border-radius:50%;mix-blend-mode:difference;display:none;opacity:0;transition:opacity .3s}
+.cur-live .cur,.cur-live .cur-ring{opacity:1}
+.cur{width:6px;height:6px;background:#fff;margin:-3px 0 0 -3px}
+.cur-ring{width:34px;height:34px;border:1px solid #fff;margin:-17px 0 0 -17px;transition:width .3s var(--ease),height .3s var(--ease),margin .3s var(--ease),background .3s}
+.cur-ring.big{width:72px;height:72px;margin:-36px 0 0 -36px;background:#fff}
+@media (pointer:fine){.has-cursor .cur,.has-cursor .cur-ring{display:block}.has-cursor,.has-cursor a,.has-cursor button{cursor:none}}
+
+/* preloader */
+.boot{position:fixed;inset:0;z-index:200;display:grid;grid-template-rows:1fr 1fr;pointer-events:none}
+.boot>div{background:var(--ink);transition:transform .9s cubic-bezier(.8,0,.1,1)}
+.boot>div:first-child{border-bottom:1px solid var(--line)}
+.boot-in{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:clamp(20px,4vw,48px);color:var(--mute);transition:opacity .4s}
+.boot-num{font-family:var(--f-display);font-weight:300;font-size:clamp(72px,16vw,220px);color:var(--paper);letter-spacing:-.06em;line-height:.8;font-variant-numeric:tabular-nums}
+.boot-log{display:flex;flex-direction:column;gap:4px;min-height:96px}
+.boot.done>div:first-child{transform:translateY(-100%)}
+.boot.done>div:last-child{transform:translateY(100%)}
+.boot.done .boot-in{opacity:0}
+
+/* ASCII render */
+.ascii{font-family:var(--f-mono);font-size:clamp(5px,1vw,10px);line-height:1.05;color:var(--paper);white-space:pre;margin:0;overflow:hidden;opacity:.85;text-align:center}
+.foot-ascii{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:end;margin-top:48px}
+
+/* material swatches */
+.mats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.mat{border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.mat .s{height:130px;position:relative;background-color:var(--ink)}
+.mat p{padding:12px;font-size:12px;display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--line)}
+@media (max-width:980px){.mats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:720px){
+  .hero{min-height:auto;padding-top:96px}
+  .hero::before{background:linear-gradient(0deg,var(--ink) 10%,rgba(5,5,5,.55) 60%,rgba(5,5,5,.2))}
+  #gl{opacity:.75}
+  .readout.br,.scrollcue,.sec-idx{display:none}
+  .readout.tr{top:16px}
+  .foot-ascii{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){.boot{display:none}.chrome{animation:none}}
+</style>
+
+<style>
+/* =====================================================================
+   v3 · 细节与质感（只用 transform / opacity 做动画，避免重绘）
+   ===================================================================== */
+@keyframes viewIn{from{opacity:.0;transform:translateY(14px)}to{opacity:1;transform:none}}
+body{text-rendering:optimizeLegibility}
+
+/* header: opaque glass without live blur over WebGL, hides on scroll down */
+.top{backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(180deg,rgba(5,5,5,.94),rgba(5,5,5,.82));transition:translate .5s var(--ease)}
+.top.hide{translate:0 -100%}
+.progress{position:absolute;left:0;right:0;bottom:-1px;height:1px;pointer-events:none}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,transparent,var(--paper));transform-origin:left;transform:scaleX(0)}
+
+/* nav sliding pill */
+.nav{position:relative;padding:4px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.02)}
+.nav a{z-index:1;transition:color .35s var(--ease)}
+.nav a.on{background:transparent;color:var(--ink)}
+.nav-pill{position:absolute;top:4px;bottom:4px;left:0;width:0;border-radius:999px;background:var(--paper);z-index:0;
+  transition:transform .55s var(--ease),width .55s var(--ease);box-shadow:0 0 24px -6px rgba(255,255,255,.5)}
+
+/* section hairlines fade at the edges */
+.sec{border-top-color:transparent}
+.sec::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--line-2) 18%,var(--line-2) 82%,transparent)}
+.sec[style*="border-top:0"]::before{display:none}
+
+/* buttons: glow + inner edge */
+.btn.solid{box-shadow:0 0 0 1px rgba(255,255,255,.25),0 10px 34px -10px rgba(255,255,255,.45)}
+.btn.ghost{box-shadow:inset 0 1px 0 rgba(255,255,255,.08);background:rgba(255,255,255,.02)}
+.tag{background:rgba(255,255,255,.025)}
+.tag.fill{background:var(--paper)}
+
+/* kinetic marquee: two rows, opposite directions */
+.ticker{padding-block:6px}
+.ticker-track{animation-duration:46s}
+.ticker-track.big{gap:0;padding-block:18px 10px}
+.ticker-track.big span{font-family:var(--f-display);font-weight:600;font-size:clamp(30px,5.4vw,72px);letter-spacing:-.04em;text-transform:none;gap:0;padding-right:.6em;line-height:1}
+.ticker-track.big span::after{content:"";width:.34em;height:.34em;margin-left:.6em;background:var(--paper);border-radius:50%;flex:none}
+.ticker-track.big span:nth-child(even){color:transparent;-webkit-text-stroke:1px rgba(244,244,242,.6)}
+.ticker-track.big span:nth-child(even)::after{background:none;border:1px solid var(--paper)}
+.ticker-track.rev{animation-direction:reverse;animation-duration:60s;padding-block:8px 14px;color:var(--mute)}
+.ticker-wrap{display:flex;flex-direction:column}
+
+/* event card as a ticket: notches + perforation */
+.next{overflow:hidden}
+.notch{position:absolute;left:56.52%;width:26px;height:26px;margin-left:-13px;border-radius:50%;background:var(--ink);border:1px solid var(--line-2);z-index:3;pointer-events:none}
+.notch.t{top:-14px}.notch.b{bottom:-14px}
+.next-r{border-left:1px dashed var(--line-2)}
+.stub{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px clamp(18px,3vw,30px);border-top:1px dashed var(--line-2);font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;color:var(--mute)}
+.barcode{height:22px;flex:1;max-width:160px;background:repeating-linear-gradient(90deg,var(--paper) 0 1px,transparent 1px 3px,var(--paper) 3px 5px,transparent 5px 6px,var(--paper) 6px 7px,transparent 7px 10px);opacity:.8}
+
+/* project cards: generative cover + 3D tilt */
+.pcard{--rx:0deg;--ry:0deg;--ty:0px;transform:perspective(1000px) rotateX(var(--rx)) rotateY(var(--ry)) translateY(var(--ty));transition:transform .6s var(--ease),border-color .3s}
+.pcard:hover{transform:perspective(1000px) rotateX(var(--rx)) rotateY(var(--ry)) translateY(-6px);transition:transform .15s linear,border-color .3s}
+.cover{position:relative;height:118px;margin:-8px -8px 0;border-radius:12px;border:1px solid var(--line);overflow:hidden;background-color:#000}
+.cover::before{content:"";position:absolute;inset:-20%;transition:transform 1.2s var(--ease);
+  -webkit-mask-image:radial-gradient(120% 100% at 80% 100%,#000 30%,transparent 80%);mask-image:radial-gradient(120% 100% at 80% 100%,#000 30%,transparent 80%)}
+.pcard:hover .cover::before{transform:translate(-4%,-6%) scale(1.06)}
+.cover[data-v="0"]::before{background:repeating-radial-gradient(circle at 75% 95%,rgba(244,244,242,.75) 0 1px,transparent 1.5px 9px)}
+.cover[data-v="1"]::before{background:repeating-linear-gradient(-45deg,rgba(244,244,242,.6) 0 1px,transparent 1px 7px)}
+.cover[data-v="2"]::before{background:radial-gradient(circle,rgba(244,244,242,.8) 0 1.2px,transparent 1.6px) 0 0/9px 9px}
+.cover[data-v="3"]::before{background:repeating-linear-gradient(0deg,rgba(244,244,242,.7) 0 2px,transparent 2px 6px),linear-gradient(90deg,transparent 0 30%,#000 30% 34%,transparent 34% 62%,#000 62% 64%,transparent 64%);background-blend-mode:normal}
+.cover[data-v="4"]::before{background:linear-gradient(rgba(244,244,242,.45) 1px,transparent 1px) 0 0/14px 14px,linear-gradient(90deg,rgba(244,244,242,.45) 1px,transparent 1px) 0 0/14px 14px}
+.cover[data-v="5"]::before{background:conic-gradient(from 0deg at 78% 92%,rgba(244,244,242,.7) 0 2deg,transparent 2deg 10deg) 0 0/100% 100%;background-repeat:no-repeat}
+.cover .ini{position:absolute;left:14px;bottom:8px;font-family:var(--f-display);font-weight:800;font-size:54px;letter-spacing:-.06em;line-height:1;color:transparent;-webkit-text-stroke:1px rgba(244,244,242,.85)}
+.cover .id{position:absolute;right:12px;top:10px;font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;color:var(--mute)}
+.pcard.st-pause-card .cover{filter:grayscale(1);opacity:.5}
+
+/* sparkline draw-on */
+#sparkline{stroke-dasharray:260;stroke-dashoffset:260}
+.view.on #sparkline{animation:draw 1.8s .4s cubic-bezier(.2,.7,.1,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+
+/* footer wordmark fills with chrome on hover */
+.giant{transition:-webkit-text-stroke-color .4s}
+.giant:hover{background:var(--mat-chrome);background-size:100% 220%;-webkit-background-clip:text;background-clip:text;-webkit-text-stroke-color:transparent}
+
+/* eyebrow marker */
+.eyebrow::before{width:7px;height:7px;background:none;border:1px solid var(--paper);transform:rotate(45deg)}
+
+@media (max-width:720px){
+  .notch{display:none}
+  .next-r{border-left:0;border-top:1px dashed var(--line-2)}
+  .dock{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);background:rgba(12,12,13,.9)}
+  .ticker-track.big span{font-size:34px}
+}
+@media (prefers-reduced-motion:reduce){#sparkline{stroke-dashoffset:0}.pcard{transform:none}}
+</style>
+
+<style>
+/* =====================================================================
+   v4 · 内页细节
+   ===================================================================== */
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* shared page header: title left, spec readout right */
+.page-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px 48px;align-items:end;margin-bottom:24px}
+.page-title{font-size:clamp(40px,8vw,108px)}
+.page-aside{display:grid;grid-template-columns:repeat(3,auto);margin:0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--mat-glass)}
+.page-aside>div{padding:14px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.page-aside>div+div{border-left:1px solid var(--line)}
+.page-aside dt{margin:0}
+.page-aside dd{margin:0;font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:-.02em;white-space:nowrap}
+
+/* ---------- events: roadmap strip ---------- */
+.road{margin-top:40px;border:1px solid var(--line);border-radius:18px;padding:18px;background:var(--mat-glass)}
+.road-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.legend{display:flex;gap:16px;flex-wrap:wrap}
+.legend>span{display:inline-flex;align-items:center;gap:6px}
+.lg{width:10px;height:10px;display:inline-block}
+.lg-off{background:repeating-linear-gradient(-45deg,transparent 0 2px,rgba(255,255,255,.35) 2px 3px);border:1px solid var(--line-2)}
+.lg-cp{background:var(--paper);transform:rotate(45deg) scale(.8)}
+.lg-now{width:2px;background:var(--paper);box-shadow:0 0 8px var(--paper)}
+.road-scroll{overflow-x:auto;margin-inline:-4px;padding-inline:4px;scrollbar-width:thin}
+.road-inner{position:relative;min-width:760px;padding-bottom:58px}
+.road .weeks{grid-template-columns:repeat(8,minmax(0,1fr));margin-top:0}
+.road .wk{min-height:108px;border-bottom:0}
+.road .wk:nth-child(4){border-right:1px solid var(--line)}
+.road-marks{position:absolute;inset:0;pointer-events:none}
+.road-marks>span{position:absolute;top:0;bottom:0;width:0}
+.cp i{position:absolute;bottom:30px;left:-7px;width:14px;height:14px;background:var(--paper);transform:rotate(45deg);box-shadow:0 0 0 4px var(--ink)}
+.cp em,.lastday em,.today em{position:absolute;bottom:2px;left:0;transform:translateX(-50%);font-style:normal;font-family:var(--f-mono);font-size:10px;letter-spacing:.06em;white-space:nowrap;color:var(--mute)}
+.cp:last-child em,.road-marks .cp:nth-child(3) em{transform:translateX(-90%)}
+.lastday{border-left:1px dashed var(--paper);bottom:52px!important;opacity:.8}
+.lastday em{bottom:auto;top:-18px;color:var(--paper)}
+.today{border-left:2px solid var(--paper);bottom:52px!important;box-shadow:0 0 12px var(--paper)}
+.today em{bottom:auto;top:auto;bottom:-20px;color:var(--paper)}
+.today::before{content:"";position:absolute;top:-4px;left:-5px;width:8px;height:8px;border-radius:50%;background:var(--paper);animation:ping 1.8s infinite}
+
+/* build night rhythm */
+.bn-flow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:28px;border-top:1px solid var(--line)}
+.bn-flow>div{padding:22px 22px 6px 0;display:flex;flex-direction:column;gap:8px;position:relative}
+.bn-flow>div+div{padding-left:22px;border-left:1px solid var(--line)}
+.bn-flow>div::before{content:"";position:absolute;top:-4px;left:0;width:7px;height:7px;background:var(--paper)}
+.bn-flow>div+div::before{left:-4px}
+.bn-flow b{font-family:var(--f-display);font-weight:600;font-size:20px;letter-spacing:-.02em}
+.bn-flow p{font-size:13.5px}
+
+/* event list */
+.list-head{margin-top:44px;display:flex;flex-direction:column;gap:18px}
+.ev-cols,.ev{display:grid;grid-template-columns:44px 120px minmax(0,1fr) minmax(0,220px) 44px;gap:20px;align-items:center}
+.ev-cols{padding-bottom:10px;border-bottom:1px solid var(--line)}
+.ev-list{border-top:0}
+.ev{padding:24px 0;color:inherit}
+.ev-main{display:flex;flex-direction:column;gap:10px;min-width:0}
+.ev-meta{display:flex;gap:10px;align-items:center}
+.ev-where{font-size:13px}
+.ev-go{width:40px;height:40px;border-radius:50%;border:1px solid var(--line-2);display:grid;place-items:center;transition:transform .5s var(--ease),background .3s,color .3s}
+.ev:hover .ev-go{transform:rotate(45deg);background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.ev:hover .ev-i{color:#55555a}
+.ev-peek{position:fixed;left:0;top:0;z-index:45;width:220px;pointer-events:none;opacity:0;transform:translate(-50%,-50%) scale(.85);transition:opacity .25s,transform .35s var(--ease);
+  border:1px solid var(--line-2);border-radius:14px;overflow:hidden;background:#000;box-shadow:0 30px 60px -20px #000}
+.ev-peek.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.ev-peek .cover{margin:0;height:130px;border:0;border-radius:0}
+.peek-t{padding:10px 12px;border-top:1px solid var(--line);color:var(--paper)}
+.empty-past{margin-top:56px;border:1px dashed var(--line-2);border-radius:18px;padding:clamp(22px,3vw,36px);display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:16px 28px;align-items:center}
+.empty-past p{font-size:16px}
+
+/* ---------- projects ---------- */
+.dist{display:flex;height:46px;margin-top:32px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.dist>div{position:relative;display:flex;align-items:center;gap:8px;padding:0 14px;min-width:0;border-right:1px solid var(--line);font-size:12.5px;white-space:nowrap;overflow:hidden;transition:flex-grow .8s var(--ease)}
+.dist>div:last-child{border-right:0}
+.dist>div::before{content:"";position:absolute;inset:0;z-index:-1;opacity:.5}
+.dist .d-recruit::before{background:linear-gradient(90deg,rgba(255,255,255,.18),rgba(255,255,255,.04))}
+.dist .d-build::before{background:repeating-linear-gradient(90deg,rgba(255,255,255,.1) 0 1px,transparent 1px 4px)}
+.dist .d-demo::before{background:repeating-linear-gradient(45deg,rgba(255,255,255,.14) 0 1px,transparent 1px 5px)}
+.dist .d-pause::before{background:rgba(255,255,255,.03)}
+.dist b{font-family:var(--f-display);font-weight:600}
+.dist{isolation:isolate}
+.toolbar{position:sticky;top:calc(env(safe-area-inset-top,0px) + 70px);z-index:40;margin-top:18px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;
+  padding:14px 16px 6px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,rgba(12,12,13,.96),rgba(12,12,13,.9));transition:top .5s var(--ease)}
+.top.hide~main .toolbar{top:calc(env(safe-area-inset-top,0px) + 10px)}
+.tb-filters{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tb-right{display:flex;align-items:center;gap:14px;margin-bottom:12px;margin-left:auto}
+.seg{display:flex;border:1px solid var(--line-2);border-radius:999px;overflow:hidden}
+.seg button{background:none;border:0;color:var(--mute);width:38px;height:32px;display:grid;place-items:center;cursor:pointer;transition:background .25s,color .25s}
+.seg button.on{background:var(--paper);color:var(--ink)}
+.pcard-add{border:1px dashed var(--line-2);border-radius:18px;min-height:300px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;text-align:center;padding:22px;color:var(--mute);transition:border-color .3s,color .3s,background .3s}
+.pcard-add:hover{border-color:var(--paper);color:var(--paper);background:rgba(255,255,255,.02)}
+.pcard-add .plus{width:56px;height:56px;border-radius:50%;border:1px solid currentColor;display:grid;place-items:center;font-size:24px;transition:transform .5s var(--ease)}
+.pcard-add:hover .plus{transform:rotate(90deg)}
+
+/* list layout reuses the same cards */
+#plaza.as-list{grid-template-columns:1fr;gap:0;border-top:1px solid var(--line)}
+#plaza.as-list .pcard{display:grid;grid-template-columns:72px minmax(0,1.5fr) 120px minmax(0,1fr) 150px 80px;gap:20px;align-items:center;min-height:0;padding:14px 4px;border-radius:0;
+  background:none;box-shadow:none;border:0;border-bottom:1px solid var(--line);transform:none}
+#plaza.as-list .pcard::after,#plaza.as-list .pcard>.c{display:none}
+#plaza.as-list .pcard:hover{background:rgba(255,255,255,.025);transform:none}
+#plaza.as-list .cover{order:0;height:48px;margin:0;border-radius:8px}
+#plaza.as-list .cover .ini{font-size:24px;left:8px;bottom:4px}
+#plaza.as-list .cover .id{display:none}
+#plaza.as-list .pcard>div:nth-child(3){order:1}
+#plaza.as-list .pcard-top{order:2;flex-direction:column;align-items:flex-start;gap:4px}
+#plaza.as-list .pcard>div:nth-child(4){order:3}
+#plaza.as-list .pcard>div:nth-child(5){order:4}
+#plaza.as-list .pcard-foot{order:5;border:0;padding:0;justify-content:flex-end}
+#plaza.as-list .pcard-foot .avatar{display:none}
+#plaza.as-list .prob,#plaza.as-list .pcard>div:nth-child(4)>.mono,#plaza.as-list .pcard>div:nth-child(5)>.mono{display:none}
+#plaza.as-list .pcard h3{font-size:17px}
+#plaza.as-list .prog i{height:10px}
+#plaza.as-list .pcard-add{display:none}
+</style>
+<style>
+/* ---------- project detail ---------- */
+.d-banner{position:relative;height:clamp(200px,28vw,320px);border-bottom:1px solid var(--line);overflow:hidden}
+.d-banner>.cover{position:absolute;inset:0;margin:0;height:auto;border:0;border-radius:0}
+.d-banner>.cover::before{inset:-10%;-webkit-mask-image:radial-gradient(90% 120% at 85% 100%,#000 25%,transparent 75%);mask-image:radial-gradient(90% 120% at 85% 100%,#000 25%,transparent 75%)}
+.d-banner>.cover .ini{font-size:clamp(120px,22vw,300px);left:auto;right:var(--gut);bottom:-.18em;-webkit-text-stroke:1px rgba(244,244,242,.35)}
+.d-banner-in{position:relative;height:100%;display:flex;flex-direction:column;justify-content:space-between;padding-block:24px}
+.crumb{display:inline-flex;gap:8px;align-items:center;align-self:flex-start;padding:8px 14px;border:1px solid var(--line-2);border-radius:999px;background:rgba(5,5,5,.7);transition:border-color .3s}
+.crumb:hover{border-color:var(--paper)}
+.d-tags{display:flex;gap:8px;flex-wrap:wrap}
+.cyc-week{margin-top:32px;display:flex;flex-direction:column;gap:10px}
+.cw-head{display:flex;justify-content:space-between}
+.cw-cells{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+.cw-cells i{height:28px;border:1px solid var(--line-2);border-radius:4px;position:relative;overflow:hidden}
+.cw-cells i.f{background:var(--paper);border-color:var(--paper)}
+.cw-cells i.at{border-color:var(--paper);background:repeating-linear-gradient(-45deg,transparent 0 4px,rgba(255,255,255,.25) 4px 5px)}
+.cw-cells i.at::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);transform:translateX(-100%);animation:scanX 2.2s var(--ease) infinite}
+@keyframes scanX{to{transform:translateX(100%)}}
+.cw-labels{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;font-size:10px}
+.spec-sheet{grid-template-columns:repeat(3,minmax(0,1fr))}
+.spec-sheet>div{counter-increment:f}
+.spec-sheet{counter-reset:f}
+.spec-sheet>div>span::before{content:counter(f,decimal-leading-zero) "  ";color:var(--line-2)}
+.sub-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:56px;flex-wrap:wrap}
+.tl-fill{position:absolute;left:6px;top:6px;width:1px;height:calc(100% - 12px);background:var(--paper);transform-origin:top;transform:scaleY(0);z-index:0}
+.tl-item::before{z-index:1}
+.commit .code b{font-weight:500;color:var(--paper);margin-right:6px}
+.commit .code{color:var(--mute)}
+.quotes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px}
+.quotes blockquote{margin:0;border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px;background:var(--mat-glass)}
+.quotes p{font-size:15px;line-height:1.55}
+.quotes cite{font-style:normal}
+.slots{display:flex;flex-direction:column;gap:12px}
+.slot-row{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:10px;align-items:center;font-size:13px}
+.slot-dots{display:flex;gap:4px;flex-wrap:wrap}
+.slot-dots i{width:12px;height:12px;border-radius:50%;border:1px dashed var(--line-2)}
+.slot-dots i.f{background:var(--paper);border:1px solid var(--paper)}
+.heat-legend{display:flex;align-items:center;gap:4px;justify-content:flex-end;font-size:10px}
+.heat-legend i{width:10px;height:10px;border-radius:2px;background:var(--line)}
+.heat-legend i.l1{background:#4a4a4e}.heat-legend i.l2{background:#9a9aa0}.heat-legend i.l3{background:var(--paper)}
+.heat i{transition:transform .2s}
+.heat i:hover{transform:scale(1.5);outline:1px solid var(--paper)}
+.team{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.team li{display:flex;gap:12px;align-items:center;font-size:14px}
+.team li span{display:flex;flex-direction:column;line-height:1.3}
+.team small{font-size:12px}
+.av{width:34px;height:34px;border-radius:50%;background:var(--paper);color:var(--ink);display:grid;place-items:center;font-family:var(--f-mono);font-size:11px;flex:none}
+.av.o{background:none;color:var(--paper);border:1px dashed var(--line-2)}
+
+/* ---------- learn ---------- */
+.path{list-style:none;margin:36px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));position:relative}
+.path::before{content:"";position:absolute;left:0;right:0;top:19px;height:1px;background:var(--line-2)}
+.path li{position:relative;display:flex;flex-direction:column;gap:6px;padding-right:16px}
+.path li>span{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line-2);background:var(--ink);font-size:12px;position:relative;margin-bottom:8px}
+.path li.done>span{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+.path li.next>span{border-style:dashed}
+.path b{font-size:17px}
+.term{padding:0;display:flex;flex-direction:column;min-height:236px}
+.term-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+.term-bar .dots{margin:0}
+.term-body{margin:0;padding:16px 18px;flex:1;overflow-x:auto;font-family:var(--f-mono);font-size:12.5px;line-height:1.75}
+.term-out{padding:10px 18px;border-top:1px solid var(--line);font-size:12px}
+.term-out .ok{color:var(--paper)}
+/* monochrome highlight.js theme: weight and style instead of hue */
+.hljs{color:#cfcfd2;background:none}
+.hljs-comment{color:var(--mute);font-style:italic}
+.hljs-keyword,.hljs-built_in{color:var(--paper);font-weight:500}
+.hljs-string{color:#a9a9ae;background:rgba(255,255,255,.04);border-radius:3px}
+.hljs-title,.hljs-title.function_{color:var(--paper);text-decoration:underline dotted rgba(255,255,255,.4);text-underline-offset:3px}
+.hljs-number,.hljs-literal{color:var(--paper)}
+.hljs-attr,.hljs-property{color:#bdbdc1}
+.meta-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:6px 0 0;border-block:1px solid var(--line)}
+.meta-row>div{padding:12px 0;display:flex;flex-direction:column;gap:4px}
+.meta-row>div+div{padding-left:14px;border-left:1px solid var(--line)}
+.meta-row dt,.meta-row dd{margin:0}
+.meta-row dd{font-size:13.5px}
+.lvl{display:flex;gap:4px;align-items:center;height:20px}
+.lvl i{width:16px;height:6px;border:1px solid var(--line-2);border-radius:2px}
+.lvl i.f{background:var(--paper);border-color:var(--paper)}
+.digest-list{border-top:1px solid var(--line)}
+.dg{display:grid;grid-template-columns:70px 64px minmax(0,1fr) 120px 40px;gap:20px;align-items:center;padding:22px 0;border-bottom:1px solid var(--line);position:relative;isolation:isolate;transition:padding .4s var(--ease)}
+.dg::before{content:"";position:absolute;inset:0;background:var(--paper);transform:scaleY(0);transform-origin:bottom;transition:transform .45s var(--ease);z-index:-1}
+.dg:hover{color:var(--ink);padding-inline:16px}
+.dg:hover::before{transform:scaleY(1)}
+.dg:hover .mute{color:#55555a}
+.dg-no{font-family:var(--f-display);font-weight:300;font-size:40px;letter-spacing:-.05em;line-height:1}
+.dg-main{display:flex;flex-direction:column;gap:6px;min-width:0}
+.dg-main b{font-size:16px;font-weight:600;line-height:1.45}
+.dg-main small{font-size:13px}
+.dg-go{font-size:18px;transition:transform .4s var(--ease)}
+.dg:hover .dg-go{transform:translate(3px,-3px)}
+.ladder{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
+.rung{border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:10px;background:var(--mat-glass);min-height:calc(150px + var(--h) * 44px);position:relative;overflow:hidden}
+.rung::after{content:"";position:absolute;left:0;right:0;bottom:0;height:calc(var(--h) * 14%);background:repeating-linear-gradient(0deg,rgba(255,255,255,.07) 0 1px,transparent 1px 6px);pointer-events:none}
+.rung .lv{font-family:var(--f-display);font-weight:600;font-size:30px;letter-spacing:-.04em;line-height:1}
+.rung b{font-size:16px}
+.rung p{font-size:13px}
+.rung .tag{margin-top:auto;align-self:flex-start}
+
+/* ---------- join: member card + stepped form ---------- */
+.join2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:clamp(24px,5vw,64px);align-items:start;margin-top:24px}
+.mc-col{position:sticky;top:96px;display:flex;flex-direction:column;gap:14px;align-items:center}
+.mc-stage{width:100%;max-width:440px;perspective:1400px}
+.mcard{--rx:0deg;--ry:0deg;--gx:50%;--gy:50%;position:relative;width:100%;aspect-ratio:1.586;max-width:100%;transform-style:preserve-3d;transform:rotateX(var(--rx)) rotateY(var(--ry));transition:transform .9s var(--ease)}
+.mcard.flip{transform:rotateX(var(--rx)) rotateY(calc(var(--ry) + 180deg))}
+.mc-face{position:absolute;inset:0;border-radius:18px;padding:20px;display:flex;flex-direction:column;justify-content:space-between;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden;
+  border:1px solid rgba(255,255,255,.18);background:radial-gradient(120% 140% at 0% 0%,#1d1d1f,#070708 60%);box-shadow:0 40px 80px -30px #000,inset 0 1px 0 rgba(255,255,255,.12)}
+.mc-front::before{content:"";position:absolute;inset:0;background:var(--mat-halftone);background-size:7px 7px;-webkit-mask-image:radial-gradient(80% 90% at 100% 100%,#000,transparent 70%);mask-image:radial-gradient(80% 90% at 100% 100%,#000,transparent 70%);pointer-events:none}
+.mc-holo{position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;opacity:.55;
+  background:radial-gradient(40% 60% at var(--gx) var(--gy),rgba(255,255,255,.22),transparent 70%),linear-gradient(115deg,transparent 30%,rgba(255,255,255,.08) 45%,transparent 55%)}
+.mc-back{transform:rotateY(180deg);align-items:center}
+.mc-top{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;position:relative}
+.mc-mid{display:flex;flex-direction:column;gap:6px;position:relative;min-width:0}
+.mc-name{font-family:var(--f-display);font-weight:800;font-size:clamp(26px,4vw,40px);letter-spacing:-.04em;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mc-major{color:var(--mute);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc-skills{display:flex;gap:6px;flex-wrap:wrap;min-height:24px;margin-top:4px}
+.mc-skills .tag{height:22px}
+.mc-bot{display:flex;align-items:flex-end;gap:22px;position:relative}
+.mc-bot>div{display:flex;flex-direction:column;gap:2px;font-size:12px}
+.mc-bot b{font-weight:500;font-size:13px}
+.mc-chip{margin-left:auto;width:44px;height:34px;border-radius:7px;background:linear-gradient(135deg,#f4f4f2,#8d8d92 50%,#e6e6e3);position:relative;overflow:hidden}
+.mc-chip::after{content:"";position:absolute;inset:6px;border:1px solid rgba(0,0,0,.35);border-radius:3px;background:linear-gradient(90deg,transparent 45%,rgba(0,0,0,.35) 45% 55%,transparent 55%),linear-gradient(0deg,transparent 45%,rgba(0,0,0,.35) 45% 55%,transparent 55%)}
+.mc-qr{width:40%;aspect-ratio:1;background:var(--paper);border-radius:12px;padding:10px;max-width:100%}
+.mc-qr canvas{width:100%;height:100%;image-rendering:pixelated;display:block}
+.mc-cap{text-align:center}
+.form-head{display:flex;flex-direction:column;gap:12px}
+.steps{display:grid;overflow:hidden}
+.fstep{grid-area:1/1;border:0;margin:0;padding:0;min-width:0;display:flex;flex-direction:column;gap:22px;opacity:0;visibility:hidden;transform:translateX(30px);transition:opacity .45s var(--ease),transform .55s var(--ease),visibility 0s .5s}
+.fstep.on{opacity:1;visibility:visible;transform:none;transition:opacity .45s var(--ease) .08s,transform .55s var(--ease) .08s,visibility 0s}
+.fstep.left{transform:translateX(-30px)}
+.flabel{font-size:13px;color:var(--mute)}
+.form-nav{display:flex;gap:12px;margin-top:28px;padding-top:20px;border-top:1px solid var(--line)}
+.summary{border:1px dashed var(--line-2);border-radius:12px;padding:14px;font-size:11.5px;line-height:1.9;color:var(--mute);text-transform:none;letter-spacing:.02em}
+.summary b{color:var(--paper);font-weight:500}
+.done{align-items:flex-start;text-align:left}
+.done-next{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+#formBody{display:flex;flex-direction:column}
+
+@media (max-width:980px){
+  .spec-sheet{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ladder{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rung{min-height:0}
+  .dg{grid-template-columns:56px minmax(0,1fr) 40px}
+  .dg-date,.dg-src{display:none}
+}
+@media (max-width:720px){
+  .page-head{grid-template-columns:1fr}
+  .page-aside{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .page-aside>div{padding:12px}
+  .page-aside dd{font-size:14px;white-space:normal}
+  .bn-flow,.quotes,.spec-sheet{grid-template-columns:1fr}
+  .bn-flow>div+div{padding-left:0;border-left:0;border-top:1px solid var(--line)}
+  .bn-flow>div+div::before{left:0}
+  .ev-cols{display:none}
+  .ev{grid-template-columns:64px minmax(0,1fr) 40px;gap:14px}
+  .ev-i{display:none}
+  .ev-where{grid-column:2}
+  .ev-go{grid-row:1;grid-column:3;width:34px;height:34px}
+  .ev-peek{display:none}
+  .empty-past{grid-template-columns:1fr}
+  .toolbar{position:relative;top:auto;padding:10px 12px 2px}
+  .toolbar .filters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-12px;padding-inline:12px}
+  .toolbar .chip{flex:none}
+  .tb-right{margin-left:0;width:100%;justify-content:space-between}
+  #plaza.as-list .pcard{grid-template-columns:56px minmax(0,1fr) auto;gap:12px}
+  #plaza.as-list .pcard>div:nth-child(4),#plaza.as-list .pcard>div:nth-child(5),#plaza.as-list .pcard-foot{display:none}
+  .path{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 0}
+  .path::before{display:none}
+  .ladder{grid-template-columns:1fr}
+  .join2{grid-template-columns:1fr}
+  .mc-col{position:static}
+  .meta-row{grid-template-columns:1fr 1fr 1fr}
+  .dg-no{font-size:28px}
+}
+</style>
+
+<div class="boot" id="boot" aria-hidden="true">
+  <div></div><div></div>
+  <div class="boot-in">
+    <div class="mono" style="display:flex;justify-content:space-between;gap:16px"><span>BuilderSpace · System boot</span><span>T3 2026 / W01</span></div>
+    <div>
+      <div class="boot-log mono" id="bootLog"></div>
+      <div class="boot-num" id="bootNum">000</div>
+    </div>
+  </div>
+</div>
+<div class="cur" id="cur"></div><div class="cur-ring" id="curRing"></div>
+<div class="vignette" aria-hidden="true"></div>
+<div class="marks" aria-hidden="true"></div>
+<div class="backdrop" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="wrap">
+    <a href="#home" class="logo" aria-label="BuilderSpace 首页">
+      <span class="logo-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      BuilderSpace
+    </a>
+    <nav class="nav" aria-label="主导航">
+      <span class="nav-pill" aria-hidden="true"></span>
+      <a href="#home" data-r="home">首页</a>
+      <a href="#events" data-r="events">活动</a>
+      <a href="#projects" data-r="projects">项目广场</a>
+      <a href="#learn" data-r="learn">教程资料</a>
+      <a href="#spec" data-r="spec">设计说明</a>
+    </nav>
+    <div class="lang" role="group" aria-label="语言">
+      <button class="on" data-lang="zh" type="button">中</button>
+      <button data-lang="en" type="button">EN</button>
+    </div>
+    <a href="#join" class="btn solid" style="--h:38px;padding:0 16px;font-size:13px">加入 <span class="arr">→</span></a>
+  </div>
+  <div class="progress" aria-hidden="true"><i id="prog"></i></div>
+</header>
+
+<main>
+<!-- =========================== HOME =========================== -->
+<section class="view" id="v-home" data-view="home">
+  <div class="hero">
+    <canvas id="field" aria-hidden="true"></canvas>
+    <canvas id="gl" aria-hidden="true"></canvas>
+    <div class="readout tr mono" aria-hidden="true">
+      <span>LAT <b>-33.9173</b> · LNG <b>151.2313</b></span>
+      <span>SYD <b id="sydTime">--:--:--</b> · BJ <b id="bjTime">--:--</b></span>
+    </div>
+    <div class="readout br mono">
+      <span aria-hidden="true">FPS <b id="fps">--</b> · RES <b id="res">--</b></span>
+      <div class="rmode" role="group" aria-label="渲染模式">
+        <button type="button" class="on" data-mode="1">Dither</button>
+        <button type="button" data-mode="0">Chrome</button>
+      </div>
+    </div>
+    <div class="scrollcue mono" aria-hidden="true"><i></i>Scroll</div>
+    <div class="wrap">
+      <div class="hero-meta mono mute stagger">
+        <span class="live" style="color:var(--paper)">Cycle 01 组队报名中</span>
+        <span>Sydney · Kensington</span>
+        <span>T3 2026 / Week <b id="wkno" style="color:var(--paper)">01</b></span>
+        <span>中英双语创客社团</span>
+      </div>
+      <h1 class="display" aria-label="Bring an idea. Leave with something that works.">
+        <span class="line"><span data-scramble>Bring an idea.</span></span>
+        <span class="line"><span class="outline">Leave with</span></span>
+        <span class="line"><span><span class="chrome">something that </span><span style="white-space:nowrap"><span class="chrome">works</span><span class="cursor"></span></span></span></span>
+      </h1>
+      <div class="hero-sub stagger">
+        <p class="hero-zh">带着想法来，<b>两小时</b>做出第一个能用的页面。<br><span class="mute" style="font-size:.72em;font-weight:400">一个从 UNSW 起步的中英双语创客社团：学 Vibe Coding、找队友、每周一起把项目做出来。</span></p>
+        <div class="hero-cta">
+          <a href="#join" class="btn solid">加入 BuilderSpace <span class="arr">→</span></a>
+          <a href="#projects" class="btn ghost">看项目广场</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-wrap">
+      <div><div class="ticker-track big"><span>Build Night</span><span>Demo Night</span><span>Vibe Coding</span><span>Ship it</span><span>Pair up</span><span>Read every line</span><span>Build Night</span><span>Demo Night</span><span>Vibe Coding</span><span>Ship it</span><span>Pair up</span><span>Read every line</span></div></div>
+      <div class="mono"><div class="ticker-track rev"><span>Vibe Coding 入门</span><span>每周 Build Night</span><span>用中文提问，用英文展示</span><span>需求拆解 → 代码审阅 → 测试 → 部署</span><span>跨专业组队</span><span>4–6 周一个 Build Cycle</span><span>Vibe Coding 入门</span><span>每周 Build Night</span><span>用中文提问，用英文展示</span><span>需求拆解 → 代码审阅 → 测试 → 部署</span><span>跨专业组队</span><span>4–6 周一个 Build Cycle</span></div></div>
+    </div>
+  </div>
+
+  <!-- next event -->
+  <section class="sec" style="border-top:0">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><div class="eyebrow mono">下一场活动 / Next up</div>
+        <h2 class="h2">首场工作坊<span class="dim">，就在停课周。</span></h2></div>
+        <a href="#events" class="btn ghost" style="--h:40px">全部活动 <span class="arr">→</span></a>
+      </div>
+      <div class="next">
+        <i class="notch t" aria-hidden="true"></i><i class="notch b" aria-hidden="true"></i>
+        <div class="next-l">
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="tag fill">Workshop</span><span class="tag">零基础友好</span><span class="tag dash">讲解：中文 · 产出：英文 README</span></div>
+          <div>
+            <h3 style="font-family:var(--f-display);font-size:clamp(24px,3.2vw,38px);font-weight:600;letter-spacing:-.03em;line-height:1.1">Vibe Coding 101<br>两小时做出你的第一个页面</h3>
+            <p class="mute" style="margin-top:12px;max-width:52ch">用 AI 写，自己看得懂、调得通。从拆需求开始，到部署上线结束，带走一个能发给朋友的链接。</p>
+          </div>
+          <div class="kv">
+            <div><span class="mono mute">日期</span><b>10 月 21 日 周三</b></div>
+            <div><span class="mono mute">时间</span><b>18:30 – 20:30</b></div>
+            <div><span class="mono mute">地点</span><b>校内教室 · 报名后通知</b></div>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+            <a href="#join" class="btn solid">报名（Luma）<span class="arr">↗</span></a>
+            <span class="mono mute">已报名 <b style="color:var(--paper)" data-count="23">0</b> / 40</span>
+          </div>
+        </div>
+        <div class="next-r">
+          <div>
+            <div class="countdown" id="cd">
+              <div><b data-u="d">00</b><span class="mono mute">天</span></div>
+              <div><b data-u="h">00</b><span class="mono mute">时</span></div>
+              <div><b data-u="m">00</b><span class="mono mute">分</span></div>
+              <div><b data-u="s">00</b><span class="mono mute">秒</span></div>
+            </div>
+            <div class="agenda">
+              <span class="mono mute">流程</span>
+              <ul>
+                <li><span>18:30</span><span>5 分钟讲清楚 Vibe Coding 能做什么、不能做什么</span></li>
+                <li><span>18:45</span><span>把一个想法拆成 3 个能验证的功能</span></li>
+                <li><span>19:15</span><span>结对开发：写、读、改，每一步都看懂</span></li>
+                <li><span>20:10</span><span>部署上线 + 1 分钟展示</span></li>
+              </ul>
+            </div>
+          </div>
+          <div class="stub" aria-hidden="true"><span>BS-WS01 · ADMIT ONE</span><span class="barcode"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- three selling points -->
+  <section class="sec">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><div class="eyebrow mono">为什么来这里</div>
+        <h2 class="h2">做项目这件事，<br><span class="dim">一个人很容易半途而废。</span></h2></div>
+      </div>
+      <div class="pillars">
+        <div class="pillar"><span class="glyph">中/EN</span><h3>用中文也能问</h3><p class="mute">讲解和答疑用中文，README、Demo 和 pitch 用英文。作品能直接放进简历和 LinkedIn。</p></div>
+        <div class="pillar"><span class="glyph">[WED]</span><h3>每周固定见面</h3><p class="mute">Build Night 每周同一时间、同一地点。线上先抛问题，线下一起写代码，进度不再靠自觉。</p></div>
+        <div class="pillar"><span class="glyph">→ DEMO</span><h3>做出来有地方展示</h3><p class="mute">每个周期以 Demo Night 收尾，项目卡长期挂在项目广场，愿意的话推荐给 UNSW Founders 或整理成作品集。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- build cycle -->
+  <section class="sec">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><div class="eyebrow mono">Build Cycle 01 · W3 – W6</div>
+        <h2 class="h2">4–6 周，<span class="dim">从一个想法到一次演示。</span></h2></div>
+        <p class="lede">每个周期公开每个项目“缺什么人”。商科、设计同学和开发者在第一周配对，工具额度优先给有进展的项目。</p>
+      </div>
+      <div class="cycle" id="cycle">
+        <div class="cycle-rail"><i></i></div>
+        <div class="step done"><div class="node">01</div><h3>组队 Pitch</h3><p>每人 90 秒讲想法，现场按“缺的角色”配对。</p><span class="mono">W3 · 10/28</span></div>
+        <div class="step now"><div class="node">02</div><h3>每周 Build Night</h3><p>线上周一抛问题，线下周三一起写。每两周在项目卡上更新一次进展。</p><span class="mono">W3 – W6</span></div>
+        <div class="step"><div class="node">03</div><h3>中期检查</h3><p>跑通一个核心流程，卡住的项目一对一回访。</p><span class="mono">W4 · 11/8</span></div>
+        <div class="step"><div class="node">04</div><h3>Demo Night</h3><p>3 分钟英文演示 + 现场试用 + 同伴反馈。</p><span class="mono">W6 · 11/18</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- metrics -->
+  <section class="sec">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><div class="eyebrow mono">公开数据 · 每两周更新</div>
+        <h2 class="h2">我们只看一个数：<br><span class="dim">有多少项目在动。</span></h2></div>
+        <span class="tag dash">演示数据，非真实统计</span>
+      </div>
+      <div class="metrics">
+        <div class="metric star">
+          <span class="mono mute">北极星 · 双周活跃项目</span>
+          <div class="big"><span data-count="5">0</span><sup>/ 8</sup></div>
+          <p class="mute" style="font-size:13px">过去 14 天有代码提交、Demo 或更新帖的成员项目</p>
+          <svg class="spark" viewBox="0 0 200 46" preserveAspectRatio="none" aria-hidden="true"><polyline id="sparkline" fill="none" stroke="currentColor" stroke-width="2" points="0,44 40,40 80,32 120,30 160,18 200,12"/><circle cx="200" cy="12" r="4" fill="currentColor"/></svg>
+        </div>
+        <div class="metric"><span class="mono mute">群成员</span><div class="big"><span data-count="86">0</span></div><span class="mono mute">目标 150</span><div class="bar"><i data-w="57"></i></div></div>
+        <div class="metric"><span class="mono mute">累计到场</span><div class="big"><span data-count="34">0</span></div><span class="mono mute">目标 60</span><div class="bar"><i data-w="57"></i></div></div>
+        <div class="metric"><span class="mono mute">两周内再来</span><div class="big"><span data-count="35">0</span><sup>%</sup></div><span class="mono mute">假设值，W2 后校准</span><div class="bar"><i data-w="35"></i></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- featured projects -->
+  <section class="sec">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><div class="eyebrow mono">精选项目</div>
+        <h2 class="h2">正在做的东西。</h2></div>
+        <a href="#projects" class="btn ghost" style="--h:40px">进入项目广场 <span class="arr">→</span></a>
+      </div>
+      <div class="grid-p" id="featured"></div>
+    </div>
+  </section>
+</section>
+
+<!-- =========================== EVENTS =========================== -->
+<section class="view" id="v-events" data-view="events">
+  <section class="sec" style="border-top:0">
+    <div class="wrap">
+      <div class="page-head">
+        <div style="min-width:0">
+          <div class="eyebrow mono">活动 / Events · T3 2026</div>
+          <h1 class="display page-title"><span class="line"><span>Every week,</span></span><span class="line"><span class="outline">same time.</span></span></h1>
+        </div>
+        <dl class="page-aside">
+          <div><dt class="mono mute">下一场</dt><dd>10/21 · 18:30</dd></div>
+          <div><dt class="mono mute">Build Night</dt><dd>每周三晚</dd></div>
+          <div><dt class="mono mute">本学期线下</dt><dd>5 场</dd></div>
+        </dl>
+      </div>
+      <p class="lede">每周 1 场固定 Build Night，隔周 1 场 Demo 或主题活动。11 月 20 日是 T3 最后一个教学日，之后只做线上答疑。</p>
+
+      <div class="road">
+        <div class="road-head mono mute">
+          <span>未来 8 周 · UNSW T3 校历</span>
+          <span class="legend"><span><i class="lg lg-off"></i>停课 / 考试期</span><span><i class="lg lg-cp"></i>检查点</span><span><i class="lg lg-now"></i>今天</span></span>
+        </div>
+        <div class="road-scroll">
+          <div class="road-inner">
+            <div class="weeks">
+              <div class="wk now"><span class="mono mute">10/12</span><b>W1</b><span class="pill">对齐 · 预热 · 官网 v0</span></div>
+              <div class="wk off"><span class="mono mute">10/19</span><b>W2</b><span class="pill">停课周 · 首场工作坊</span></div>
+              <div class="wk"><span class="mono mute">10/26</span><b>W3</b><span class="pill">组队 Pitch · Build Night</span></div>
+              <div class="wk"><span class="mono mute">11/2</span><b>W4</b><span class="pill">Demo Night 1</span></div>
+              <div class="wk"><span class="mono mute">11/9</span><b>W5</b><span class="pill">Build Night</span></div>
+              <div class="wk"><span class="mono mute">11/16</span><b>W6</b><span class="pill">Demo Night 2 · 线下最后一场</span></div>
+              <div class="wk off"><span class="mono mute">11/23</span><b>W7</b><span class="pill">复习周 · 线上答疑</span></div>
+              <div class="wk off"><span class="mono mute">11/30</span><b>W8</b><span class="pill">考试期 · 复盘</span></div>
+            </div>
+            <div class="road-marks" aria-hidden="true">
+              <span class="cp" style="left:10.7%"><i></i><em>访谈达标？10/18</em></span>
+              <span class="cp" style="left:48.2%"><i></i><em>W4 检查点 11/8</em></span>
+              <span class="cp" style="left:94.6%"><i></i><em>两月复盘 12/4</em></span>
+              <span class="lastday" style="left:70.5%"><em>T3 最后教学日 11/20</em></span>
+              <span class="today" id="todayMark"><em>今天</em></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bn-flow">
+        <div><span class="mono mute">周一 · 线上</span><b>群里抛问题</b><p class="mute">每个项目贴出这周要解决的一件事，提前找好能帮忙的人。</p></div>
+        <div><span class="mono mute">周三 18:30 · 线下</span><b>一起写两小时</b><p class="mute">按项目坐，卡住就举手。讲解用中文，提交记录用英文。</p></div>
+        <div><span class="mono mute">每两周 · 项目卡</span><b>更新一次进展</b><p class="mute">代码提交、Demo 或更新帖任一，计入双周活跃项目数。</p></div>
+      </div>
+
+      <div class="cal-row">
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:0"><b style="font-size:14px">订阅活动日历</b><span class="mute" style="font-size:13px">导入 Google 或 Apple 日历，新活动自动出现。</span></div>
+        <div style="display:flex;gap:8px;align-items:center;min-width:0;flex-wrap:wrap">
+          <code class="code" id="ics">webcal://builderspace.example/events.ics</code>
+          <button class="chip" type="button" id="copyIcs">复制链接</button>
+        </div>
+      </div>
+
+      <div class="list-head">
+        <div class="filters"><span class="mono mute label">类型</span>
+          <button class="chip on" type="button" data-ef="all">全部</button>
+          <button class="chip" type="button" data-ef="build">Build Night</button>
+          <button class="chip" type="button" data-ef="demo">Demo Night</button>
+          <button class="chip" type="button" data-ef="ws">工作坊</button>
+          <button class="chip" type="button" data-ef="online">线上</button>
+        </div>
+        <div class="ev-cols mono mute" aria-hidden="true"><span>#</span><span>日期</span><span>活动</span><span>地点</span><span></span></div>
+      </div>
+      <div class="ev-list" id="evlist"></div>
+      <div class="ev-peek" id="evPeek" aria-hidden="true"><div class="cover" data-v="0"><span class="ini">BN</span><span class="id">BS-EV</span></div><div class="peek-t mono">Build Night</div></div>
+
+      <div class="empty-past">
+        <span class="mono mute">往期资料</span>
+        <p>首场活动结束后 48 小时内，讲义、示例仓库和录屏会出现在这里。</p>
+        <a href="#learn" class="btn ghost" style="--h:38px">先看教程资料 <span class="arr">→</span></a>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- =========================== PROJECTS =========================== -->
+<section class="view" id="v-projects" data-view="projects">
+  <section class="sec" style="border-top:0">
+    <div class="wrap">
+      <div class="page-head">
+        <div style="min-width:0">
+          <div class="eyebrow mono">项目广场 / Project Plaza · Cycle 01</div>
+          <h1 class="display page-title"><span class="line"><span>Find a team.</span></span><span class="line"><span class="outline">Ship a thing.</span></span></h1>
+        </div>
+        <dl class="page-aside">
+          <div><dt class="mono mute">公开项目</dt><dd id="stTotal">6</dd></div>
+          <div><dt class="mono mute">招募中</dt><dd id="stRecruit">2</dd></div>
+          <div><dt class="mono mute">最缺的角色</dt><dd id="stRole">前端</dd></div>
+        </dl>
+      </div>
+      <p class="lede">每张卡写清楚问题、目标用户、进度和缺的角色。投稿经人工审核后公开，发起人每两周更新一次进展。</p>
+
+      <div class="dist" id="dist" aria-label="项目状态分布"></div>
+
+      <div class="toolbar">
+        <div class="tb-filters">
+          <div class="filters" id="fStatus"><span class="mono mute label">状态</span>
+            <button class="chip on" type="button" data-s="all">全部 <span class="n"></span></button>
+            <button class="chip" type="button" data-s="recruit"><i class="st-dot st-recruit"></i>招募中 <span class="n"></span></button>
+            <button class="chip" type="button" data-s="build"><i class="st-dot st-build"></i>进行中 <span class="n"></span></button>
+            <button class="chip" type="button" data-s="demo"><i class="st-dot st-demo"></i>已 Demo <span class="n"></span></button>
+            <button class="chip" type="button" data-s="pause"><i class="st-dot st-pause"></i>暂停 <span class="n"></span></button>
+          </div>
+          <div class="filters" id="fRole"><span class="mono mute label">缺的角色</span>
+            <button class="chip on" type="button" data-role="all">不限</button>
+            <button class="chip" type="button" data-role="前端">前端</button>
+            <button class="chip" type="button" data-role="后端">后端</button>
+            <button class="chip" type="button" data-role="设计">设计</button>
+            <button class="chip" type="button" data-role="产品/商科">产品/商科</button>
+            <button class="chip" type="button" data-role="试用者">试用者</button>
+          </div>
+        </div>
+        <div class="tb-right">
+          <span class="mono mute">显示 <b id="pCount" style="color:var(--paper)">6</b> / <span id="pAll">6</span></span>
+          <div class="seg" role="group" aria-label="视图">
+            <button type="button" class="on" data-layout="grid" aria-label="卡片视图"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><rect x="1" y="1" width="6" height="6"/><rect x="9" y="1" width="6" height="6"/><rect x="1" y="9" width="6" height="6"/><rect x="9" y="9" width="6" height="6"/></svg></button>
+            <button type="button" data-layout="list" aria-label="列表视图"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><rect x="1" y="2" width="14" height="2"/><rect x="1" y="7" width="14" height="2"/><rect x="1" y="12" width="14" height="2"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="grid-p" id="plaza"></div>
+      <p class="mono mute" id="empty" hidden style="padding:48px 0;text-align:center">没有符合条件的项目 · 换个筛选试试</p>
+    </div>
+  </section>
+</section>
+
+<!-- =========================== PROJECT DETAIL =========================== -->
+<section class="view" id="v-project" data-view="project">
+  <div class="d-banner">
+    <div class="cover" data-v="0" aria-hidden="true"><span class="ini">Co</span></div>
+    <div class="wrap d-banner-in">
+      <a href="#projects" class="mono crumb">← 项目广场 <span class="mute">/ BS-001</span></a>
+      <div class="d-tags"><span class="tag fill"><i class="st-dot st-build" style="border-color:var(--ink)"></i>进行中</span><span class="tag">Cycle 01</span><span class="tag dash">Next.js · Supabase</span></div>
+    </div>
+  </div>
+  <section class="sec" style="border-top:0;padding-top:clamp(28px,4vw,48px)">
+    <div class="wrap">
+      <div class="detail">
+        <div style="min-width:0">
+          <div class="dhead">
+            <h1 data-scramble>CourseMate</h1>
+            <p class="mute" style="font-size:18px;margin-top:16px;max-width:46ch">选课前想知道一门课的真实工作量，现在只能翻群聊记录。</p>
+          </div>
+
+          <div class="cyc-week" aria-label="Cycle 01 进度：第 4 周，共 6 周">
+            <div class="cw-head mono"><span class="mute">Cycle 01 进度</span><span>第 4 / 6 周</span></div>
+            <div class="cw-cells"><i class="f"></i><i class="f"></i><i class="f"></i><i class="at"></i><i></i><i></i></div>
+            <div class="cw-labels mono mute"><span>Pitch</span><span></span><span></span><span>中期检查</span><span></span><span>Demo</span></div>
+          </div>
+
+          <div class="fields spec-sheet">
+            <div><span class="mono mute">问题</span><p>课程信息分散在 Handbook、群聊和小红书，新生不知道该信哪条。</p></div>
+            <div><span class="mono mute">目标用户</span><p>UNSW 授课型硕士一年级，IT / CS / 数据类。</p></div>
+            <div><span class="mono mute">进度</span><p>课程搜索和评价表单已上线内测，32 位同学试用。</p></div>
+            <div><span class="mono mute">缺的角色</span><p>试用者 10 位、后端 1 位。</p></div>
+            <div><span class="mono mute">下一步</span><p>Demo Night 前完成按学期筛选，收集 10 条试用反馈。</p></div>
+            <div><span class="mono mute">联系人</span><p>Bob · 通过管理员微信对接</p></div>
+          </div>
+
+          <div class="sub-head"><h2 class="h2" style="font-size:26px">进展时间线</h2><span class="mono mute">3 次更新 · 过去 14 天</span></div>
+          <div class="tl" id="tl">
+            <i class="tl-fill" aria-hidden="true"></i>
+            <div class="tl-item k"><span class="mono mute">11/04 · Demo Night 1</span><h4>现场 12 人试用，收到 9 条反馈</h4><p>最常见的问题：评价太少时看不出差别。下一步加“样本量”提示。</p></div>
+            <div class="tl-item"><span class="mono mute">10/29 · Build Night</span><h4>课程搜索接上 Supabase 全文检索</h4><p>和新加入的设计同学一起改了移动端列表。</p><div class="commit"><span class="code"><b>a3f9c21</b> feat: course search (fts)</span><span class="code"><b>7be04d8</b> fix: mobile list overflow</span></div></div>
+            <div class="tl-item"><span class="mono mute">10/28 · 组队 Pitch</span><h4>招到 1 位设计、1 位后端</h4><p>项目卡上“缺的角色”从 3 个降到 1 个。</p></div>
+          </div>
+
+          <div class="sub-head"><h2 class="h2" style="font-size:26px">Demo Night 反馈</h2><span class="tag dash">示例</span></div>
+          <div class="quotes">
+            <blockquote><p>“搜索很快，但我想先按学期筛，再看评价。”</p><cite class="mono mute">MIT 一年级 · 试用 6 分钟</cite></blockquote>
+            <blockquote><p>“只有两条评价的课，最好提醒我样本太少。”</p><cite class="mono mute">数据科学硕士 · 试用 4 分钟</cite></blockquote>
+            <blockquote><p>“README 写得清楚，我能直接跑起来。”</p><cite class="mono mute">CS 本科 · 同伴互测</cite></blockquote>
+          </div>
+        </div>
+
+        <aside class="side">
+          <div class="box">
+            <span class="mono mute">还缺</span>
+            <div class="slots">
+              <div class="slot-row"><span>试用者</span><span class="slot-dots"><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="mono mute">3/10</span></div>
+              <div class="slot-row"><span>后端</span><span class="slot-dots"><i></i></span><span class="mono mute">0/1</span></div>
+            </div>
+            <a href="#join" class="btn solid" style="justify-content:center">加入这个项目 <span class="arr">→</span></a>
+            <button class="chip" type="button" id="copyProj" style="justify-content:center">复制项目链接</button>
+          </div>
+          <div class="box">
+            <div style="display:flex;justify-content:space-between;gap:8px"><span class="mono mute">最近 8 周活跃度</span><span class="tag fill" style="height:20px">计入北极星</span></div>
+            <div class="heat" id="heat"></div>
+            <div class="heat-legend mono mute"><span>少</span><i></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><span>多</span></div>
+          </div>
+          <div class="box">
+            <span class="mono mute">团队</span>
+            <ul class="team">
+              <li><b class="av">BL</b><span>Bob<small class="mute">发起人 · 全栈</small></span></li>
+              <li><b class="av">HX</b><span>Xin<small class="mute">设计</small></span></li>
+              <li><b class="av o">+2</b><span>开发 1 · 产品 1<small class="mute">Cycle 01 加入</small></span></li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- =========================== LEARN =========================== -->
+<section class="view" id="v-learn" data-view="learn">
+  <section class="sec" style="border-top:0">
+    <div class="wrap">
+      <div class="page-head">
+        <div style="min-width:0">
+          <div class="eyebrow mono">教程资料 / Learn</div>
+          <h1 class="display page-title"><span class="line"><span>Write with AI.</span></span><span class="line"><span class="outline">Read every line.</span></span></h1>
+        </div>
+        <dl class="page-aside">
+          <div><dt class="mono mute">工作坊</dt><dd>2 期</dd></div>
+          <div><dt class="mono mute">资料上线</dt><dd>48 小时内</dd></div>
+          <div><dt class="mono mute">每周精选</dt><dd>周四</dd></div>
+        </dl>
+      </div>
+      <p class="lede">我们教的是软件开发，AI 只是工具。每一期都落在同一条路径上：会拆需求、读得懂代码、写得出测试、部署得上线。</p>
+
+      <ol class="path" aria-label="学习路径">
+        <li class="done"><span class="mono">01</span><b>需求拆解</b><small class="mute">Workshop 01</small></li>
+        <li class="next"><span class="mono">02</span><b>代码审阅</b><small class="mute">Workshop 02</small></li>
+        <li class="next"><span class="mono">03</span><b>测试</b><small class="mute">Workshop 02</small></li>
+        <li class="done"><span class="mono">04</span><b>部署</b><small class="mute">Workshop 01</small></li>
+      </ol>
+
+      <div class="learn" style="margin-top:40px">
+        <article class="lcard">
+          <div class="term">
+            <div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span class="mono mute">workshop-01.sh</span><span class="mono mute">zsh</span></div>
+            <div class="term-body"><div class="tw"></div></div>
+          </div>
+          <div class="body">
+            <span class="mono mute">Workshop 01 · 10/21 · 停课周</span>
+            <h3 style="font-size:20px">Vibe Coding 101：两小时做出第一个页面</h3>
+            <p class="mute">把想法拆成 3 个功能，让 AI 写，自己逐行读懂，再部署到 Vercel。</p>
+            <dl class="meta-row"><div><dt class="mono mute">时长</dt><dd>2 小时</dd></div><div><dt class="mono mute">难度</dt><dd class="lvl" aria-label="入门"><i class="f"></i><i></i><i></i></dd></div><div><dt class="mono mute">产出</dt><dd>一个上线的页面</dd></div></dl>
+            <div class="links"><span class="tag">讲义 PDF</span><span class="tag">示例仓库</span><span class="tag dash">录屏 · 活动后上线</span></div>
+          </div>
+        </article>
+        <article class="lcard">
+          <div class="term">
+            <div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span class="mono mute">project-card.test.ts</span><span class="mono mute">vitest</span></div>
+            <pre class="term-body"><code class="language-typescript">// 先写验收标准，再让 AI 写实现
+describe("项目卡", () =&gt; {
+  it("未审核的卡不公开", async () =&gt; {
+    const card = await createCard({ status: "pending" });
+    expect(await listPublic()).not.toContain(card.id);
+  });
+  it("可按缺的角色筛选", () =&gt; {
+    expect(filterByRole(cards, "前端")).toHaveLength(3);
+  });
+});</code></pre>
+            <div class="term-out mono"><span class="ok">✓ 2 passed</span> <span class="mute">(312ms)</span></div>
+          </div>
+          <div class="body">
+            <span class="mono mute">Workshop 02 · 11/04 · 筹备中</span>
+            <h3 style="font-size:20px">AI 写的代码，怎么审、怎么测</h3>
+            <p class="mute">代码审阅清单、最小测试、读报错。针对“调试 AI 代码很花时间”这件事。</p>
+            <dl class="meta-row"><div><dt class="mono mute">时长</dt><dd>2 小时</dd></div><div><dt class="mono mute">难度</dt><dd class="lvl" aria-label="进阶"><i class="f"></i><i class="f"></i><i></i></dd></div><div><dt class="mono mute">产出</dt><dd>一份测试文件</dd></div></dl>
+            <div class="links"><span class="tag dash">筹备中</span></div>
+          </div>
+        </article>
+      </div>
+
+      <div class="sec-head" style="margin-top:88px">
+        <div><div class="eyebrow mono">每周精选 · Weekly</div><h2 class="h2">一篇资讯，加校内活动。</h2></div>
+        <span class="mono mute">每周四更新 · 只写摘要，附原文链接</span>
+      </div>
+      <div class="digest-list">
+        <a class="dg" href="#learn"><span class="dg-no">03</span><span class="mono mute dg-date">10/30</span><span class="dg-main"><b>Stack Overflow 2025 调查：84% 在用或计划用 AI 工具，46% 不信任其准确性</b><small class="mute">会用不等于能交付。这周 Build Night 练代码审阅。</small></span><span class="mono mute dg-src">Stack Overflow</span><span class="dg-go" aria-hidden="true">↗</span></a>
+        <a class="dg" href="#learn"><span class="dg-no">02</span><span class="mono mute dg-date">10/23</span><span class="dg-main"><b>“vibe coding” 成为 Collins 词典 2025 年度词汇</b><small class="mute">名词火了，但近 77% 的开发者说它不在自己的正式开发流程里。</small></span><span class="mono mute dg-src">CNN</span><span class="dg-go" aria-hidden="true">↗</span></a>
+        <a class="dg" href="#learn"><span class="dg-no">01</span><span class="mono mute dg-date">10/16</span><span class="dg-main"><b>校内本周：AI: After Hours 周二傍晚开放 build</b><small class="mute">想多一个晚上写代码的同学可以一起去，Build Night 不和它撞时间。</small></span><span class="mono mute dg-src">Eventbrite</span><span class="dg-go" aria-hidden="true">↗</span></a>
+      </div>
+
+      <div class="sec-head" style="margin-top:88px">
+        <div><div class="eyebrow mono">工具额度</div><h2 class="h2">资源跟着进展走。</h2></div>
+        <span class="tag dash">L0 每月核实 · 发布前用真实账号实测</span>
+      </div>
+      <div class="ladder">
+        <div class="rung" style="--h:1"><span class="lv">L0</span><b>现成学生权益</b><p class="mute">GitHub Education、Google 学生 AI 方案等，自己领取。是否对澳洲开放待实测。</p><span class="tag dash">整理中</span></div>
+        <div class="rung" style="--h:2"><span class="lv">L1</span><b>工作坊兑换码</b><p class="mute">个人兑换码随工作坊发放，不共享团队 API 密钥。</p><span class="tag">W3 起</span></div>
+        <div class="rung" style="--h:3"><span class="lv">L2</span><b>项目额度</b><p class="mute">已在推进的项目按需申请，按双周进展决定是否续发。</p><span class="tag">有 L1 后</span></div>
+        <div class="rung" style="--h:4"><span class="lv">L3</span><b>长期合作</b><p class="mute">校园项目、长期赞助、联合活动。赞助未确认前不公布。</p><span class="tag">2027 T1</span></div>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- =========================== JOIN =========================== -->
+<section class="view" id="v-join" data-view="join">
+  <section class="sec" style="border-top:0">
+    <div class="wrap">
+      <div class="page-head">
+        <div style="min-width:0">
+          <div class="eyebrow mono">加入 / Join · 约 1 分钟</div>
+          <h1 class="display page-title"><span class="line"><span>Start</span></span><span class="line"><span class="outline">here.</span></span></h1>
+        </div>
+        <dl class="page-aside">
+          <div><dt class="mono mute">谁可以加入</dt><dd>UNSW 本科 / 硕士</dd></div>
+          <div><dt class="mono mute">我们不收</dt><dd>zID · 学生证</dd></div>
+          <div><dt class="mono mute">你的数据</dt><dd>可随时删除</dd></div>
+        </dl>
+      </div>
+
+      <div class="join2">
+        <div class="mc-col">
+          <div class="mc-stage" id="mcStage">
+            <div class="mcard" id="mcard">
+              <div class="mc-face mc-front">
+                <div class="mc-holo" aria-hidden="true"></div>
+                <div class="mc-top"><span class="logo" style="font-size:13px"><span class="logo-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>BuilderSpace</span><span class="mono mute">Member · T3 2026</span></div>
+                <div class="mc-mid">
+                  <b class="mc-name" id="mcName">Yuki</b>
+                  <span class="mc-major" id="mcMajor">Information Technology</span>
+                  <div class="mc-skills" id="mcSkills"></div>
+                </div>
+                <div class="mc-bot">
+                  <div><span class="mono mute">No.</span><b class="mono" id="mcNo">BS-T3-0087</b></div>
+                  <div><span class="mono mute">每周</span><b class="mono" id="mcTime">2–5h</b></div>
+                  <div class="mc-chip" aria-hidden="true"></div>
+                </div>
+              </div>
+              <div class="mc-face mc-back">
+                <div class="mc-top"><span class="mono mute">扫码加管理员微信</span><span class="mono mute">示意</span></div>
+                <div class="mc-qr"><canvas id="qr" width="29" height="29"></canvas></div>
+                <p class="mono mute" style="text-align:center;font-size:10.5px">备注 “BuilderSpace + 昵称”</p>
+              </div>
+            </div>
+          </div>
+          <p class="mono mute mc-cap">你的成员卡 · 跟着表单实时更新</p>
+        </div>
+
+        <form class="form" id="joinForm" novalidate>
+          <div class="form-head">
+            <div class="stepper" aria-hidden="true"><i class="on"></i><i id="s2"></i><i id="s3"></i></div>
+            <div class="mono mute step-label"><span id="stepNo">01</span> / 03 · <span id="stepName">关于你</span></div>
+          </div>
+          <div id="formBody">
+            <div class="steps" id="steps">
+              <fieldset class="fstep on" data-step="1">
+                <legend class="sr">关于你</legend>
+                <div class="fld"><label for="f-name">昵称</label><input class="inp" id="f-name" value="Yuki" autocomplete="nickname" maxlength="16"></div>
+                <div class="fld"><label for="f-degree">学校与学位</label><input class="inp" id="f-degree" value="UNSW · MIT 一年级"></div>
+                <div class="fld"><label for="f-major">专业</label><input class="inp" id="f-major" value="Information Technology"></div>
+              </fieldset>
+              <fieldset class="fstep" data-step="2">
+                <legend class="sr">想做什么</legend>
+                <div class="fld"><span class="flabel">技能（可多选）</span>
+                  <div class="opts" data-multi id="fSkills"><button type="button" class="chip on">前端</button><button type="button" class="chip">后端</button><button type="button" class="chip on">设计</button><button type="button" class="chip">产品/商科</button><button type="button" class="chip">零基础</button></div></div>
+                <div class="fld"><label for="f-idea">想做什么</label><textarea class="inp" id="f-idea">一个帮留学生合租找室友的小工具，上学期想做但一直没开始。</textarea></div>
+                <div class="fld"><span class="flabel">每周可投入</span>
+                  <div class="opts" data-single id="fTime"><button type="button" class="chip">2h 以内</button><button type="button" class="chip on">2–5h</button><button type="button" class="chip">5h 以上</button></div></div>
+              </fieldset>
+              <fieldset class="fstep" data-step="3">
+                <legend class="sr">最后一步</legend>
+                <div class="fld"><span class="flabel">从哪里知道我们</span>
+                  <div class="opts" data-single id="fSrc"><button type="button" class="chip on">小红书</button><button type="button" class="chip">微信群 / 朋友圈</button><button type="button" class="chip">朋友推荐</button><button type="button" class="chip">校园海报</button></div></div>
+                <label class="consent" for="f-ok"><input type="checkbox" id="f-ok" checked> 我同意在项目广场和活动回顾中展示我的作品（可随时撤回）</label>
+                <div class="summary mono" id="summary"></div>
+              </fieldset>
+            </div>
+            <div class="form-nav">
+              <button class="btn ghost" type="button" id="prevStep" style="--h:44px" hidden>← 上一步</button>
+              <button class="btn solid" type="button" id="nextStep" style="--h:44px;margin-left:auto">下一步 <span class="arr">→</span></button>
+              <button class="btn solid" type="submit" id="submitBtn" style="--h:44px;margin-left:auto" hidden>提交，获取管理员微信 <span class="arr">→</span></button>
+            </div>
+          </div>
+          <div class="done" id="formDone" hidden>
+            <span class="mono mute">提交成功 · 03 / 03</span>
+            <h3 style="font-family:var(--f-display);font-size:26px;font-weight:600;letter-spacing:-.03em">欢迎，<span id="doneName">Yuki</span>。</h3>
+            <p class="mute" style="max-width:36ch">成员卡已翻面，扫背面的二维码加管理员微信，管理员会拉你进群，并发下一场活动的报名链接。</p>
+            <div class="done-next">
+              <a href="#events" class="btn ghost" style="--h:40px">看下一场活动</a>
+              <button class="chip" type="button" id="again">重新填写</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+</section>
+
+<!-- =========================== SPEC =========================== -->
+<section class="view" id="v-spec" data-view="spec">
+  <section class="sec" style="border-top:0">
+    <div class="wrap">
+      <div class="eyebrow mono">设计说明 · 对应 PRD v0.5 第四节</div>
+      <h1 class="display" style="font-size:clamp(36px,7vw,92px)"><span class="line"><span>Black, white,</span></span><span class="line"><span class="outline">and a blueprint.</span></span></h1>
+      <p class="lede" style="margin-top:20px">视觉概念是“工作台图纸”：纯黑底、白色发丝线网格、等宽坐标标注。颜色只有黑白灰，状态靠形状区分（实心、空心、斜纹、灰），在微信内置浏览器和低亮度屏幕上也能一眼分辨。</p>
+
+      <h2 class="h2" style="font-size:24px;margin:56px 0 20px">色彩 Token</h2>
+      <div class="spec-grid">
+        <div class="sw"><div style="background:var(--ink);border-bottom:1px solid var(--line)"></div><p><b>--ink</b><span class="mono mute">#050505 · 页面底色</span></p></div>
+        <div class="sw"><div style="background:var(--panel);border-bottom:1px solid var(--line)"></div><p><b>--panel</b><span class="mono mute">#0C0C0D · 卡片</span></p></div>
+        <div class="sw"><div style="background:var(--mute)"></div><p><b>--mute</b><span class="mono mute">#8A8A90 · 次要文字</span></p></div>
+        <div class="sw"><div style="background:var(--paper)"></div><p><b>--paper</b><span class="mono mute">#F4F4F2 · 文字 / 反白</span></p></div>
+      </div>
+
+      <h2 class="h2" style="font-size:24px;margin:56px 0 20px">字体</h2>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>角色</th><th>字体</th><th>用在哪里</th><th>样例</th></tr></thead>
+        <tbody>
+          <tr><td>Display</td><td>Unbounded 800 / 600</td><td>英文大标题、数字、日期</td><td style="font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:-.04em">Ship a thing. 08</td></tr>
+          <tr><td>Body</td><td>Instrument Sans + Noto Sans SC</td><td>正文、表单、按钮</td><td>带着想法来，两小时做出第一个能用的页面。</td></tr>
+          <tr><td>Utility</td><td>JetBrains Mono</td><td>标签、坐标、周次、代码</td><td class="mono">W3 · 10/28 · CYCLE 01</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 class="h2" style="font-size:24px;margin:56px 0 20px">动效</h2>
+      <div class="motion">
+        <div class="mbox"><span class="mono mute">01 · 首屏</span><b>液态金属 + 1-bit 抖动</b><p class="mute" style="font-size:13px">WebGL 光线步进出几颗融合的金属球，一颗跟随指针；Bayer 8×8 抖动把它压成纯黑白网点，可切换回镜面铬。</p><div class="demo-stage"><span data-scramble style="font-family:var(--f-display);font-weight:600">BUILD NIGHT</span></div></div>
+        <div class="mbox"><span class="mono mute">02 · 反馈</span><b>反色填充</b><p class="mute" style="font-size:13px">按钮、活动行、卖点卡悬停时白色从一侧推入，文字反黑。只用黑白也有明确的状态变化。</p><div class="demo-stage"><a class="btn ghost" style="--h:36px" href="#spec">Hover me</a></div></div>
+        <div class="mbox"><span class="mono mute">03 · 数据</span><b>计数与进度</b><p class="mute" style="font-size:13px">指标数字从 0 滚动到当前值，进度条和 Build Cycle 轨道随之填充，强调“项目在动”。</p><div class="demo-stage"><span class="big" style="font-size:36px" data-count="8" data-loop>0</span></div></div>
+      </div>
+
+      <h2 class="h2" style="font-size:24px;margin:56px 0 20px">PRD 功能 → 页面对照</h2>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>优先级</th><th>功能</th><th>原型中的位置</th><th>验收标准（PRD）</th><th>上线</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag fill">P0</span></td><td>首页</td><td><a href="#home" style="text-decoration:underline">首页</a>：一句话定位、下一场活动倒计时、加入按钮、精选项目</td><td>微信内 3 秒看到首屏；不登录可看全部</td><td class="mono">W1</td></tr>
+          <tr><td><span class="tag fill">P0</span></td><td>加入表单</td><td><a href="#join" style="text-decoration:underline">加入</a>：8 个字段，提交后出管理员微信</td><td>不收集 zID 和学生证</td><td class="mono">W1</td></tr>
+          <tr><td><span class="tag fill">P0</span></td><td>活动页</td><td><a href="#events" style="text-decoration:underline">活动</a>：8 周校历条、类型筛选、往期资料</td><td>运营不改代码就能新增活动</td><td class="mono">W2</td></tr>
+          <tr><td><span class="tag fill">P0</span></td><td>项目广场</td><td><a href="#projects" style="text-decoration:underline">项目广场</a>：4 种状态 × 缺的角色筛选</td><td>表单投稿，人工审核后公开</td><td class="mono">W2</td></tr>
+          <tr><td><span class="tag fill">P0</span></td><td>教程资料</td><td><a href="#learn" style="text-decoration:underline">教程资料</a>：讲义、示例仓库、录屏</td><td>工作坊后 48 小时内上线</td><td class="mono">W2</td></tr>
+          <tr><td><span class="tag">P1</span></td><td>项目进展更新</td><td><a href="#project" style="text-decoration:underline">项目详情</a>：时间线 + 8 周活跃热力图</td><td>运营能导出双周活跃项目数</td><td class="mono">W4</td></tr>
+          <tr><td><span class="tag">P1</span></td><td>每周精选 / 日历订阅</td><td>教程资料页精选栏；活动页 ICS 链接</td><td>每条有来源和日期；能导入 Google / Apple 日历</td><td class="mono">W3–W4</td></tr>
+          <tr><td><span class="tag">P1</span></td><td>评论区</td><td>未做：W4 前讨论留在微信群</td><td>看群里讨论是否被淹没再定</td><td class="mono">W5–W6</td></tr>
+          <tr><td><span class="tag dash">P2</span></td><td>账号、匹配推荐、额度申请、跨校入口</td><td>未做</td><td>有明确需求再做</td><td class="mono">—</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 class="h2" style="font-size:24px;margin:56px 0 8px">材质包 · Material Pack</h2>
+      <p class="mute" style="margin-bottom:20px;font-size:14px">全部用 CSS 渐变、SVG 滤镜和着色器程序化生成，不加载任何图片文件，总体积不到 3 KB。每种材质都是一个 CSS 变量，开发时直接引用。</p>
+      <div class="mats">
+        <div class="mat"><div class="s" style="background-image:var(--mat-noise);background-size:220px"></div><p><b>--mat-noise</b><span class="mono mute">胶片颗粒 · 全局叠加</span></p></div>
+        <div class="mat"><div class="s" style="background-image:var(--mat-scan)"></div><p><b>--mat-scan</b><span class="mono mute">扫描线 · 首屏 / 悬停</span></p></div>
+        <div class="mat"><div class="s" style="background-image:var(--mat-halftone);background-size:6px 6px"></div><p><b>--mat-halftone</b><span class="mono mute">网点 · 项目卡底纹</span></p></div>
+        <div class="mat"><div class="s" style="background-image:var(--mat-brushed),linear-gradient(160deg,#fff,#bdbdba)"></div><p><b>--mat-brushed</b><span class="mono mute">拉丝金属 · 北极星指标</span></p></div>
+        <div class="mat"><div class="s" style="background:var(--mat-chrome);background-size:100% 220%;animation:chromeShift 4s ease-in-out infinite alternate"></div><p><b>--mat-chrome</b><span class="mono mute">镜面铬 · 标题字</span></p></div>
+        <div class="mat"><div class="s" style="background:var(--mat-glass),var(--panel)"><div class="glass" style="position:absolute;inset:22px;border-radius:12px;border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(8px)"></div></div><p><b>--mat-glass</b><span class="mono mute">玻璃面板 · 卡片 / 表单</span></p></div>
+        <div class="mat"><div class="s"><canvas id="ditherSw" width="96" height="44" style="width:100%;height:100%;image-rendering:pixelated;display:block"></canvas></div><p><b>shader · bayer 8×8</b><span class="mono mute">1-bit 抖动 · 首屏渲染</span></p></div>
+        <div class="mat"><div class="s" style="display:grid;place-items:center"><pre class="ascii" id="asciiSw" style="font-size:6px" aria-hidden="true"></pre></div><p><b>ascii · .,-~:;=!*#$@</b><span class="mono mute">字符渲染 · 页脚</span></p></div>
+      </div>
+
+      <h2 class="h2" style="font-size:24px;margin:56px 0 20px">资源清单</h2>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>资源</th><th>版本 / 来源</th><th>用途</th><th>降级方案</th></tr></thead>
+        <tbody>
+          <tr><td>Three.js</td><td class="mono">r128 · cdnjs</td><td>首屏液态金属球：光线步进 + Bayer 抖动着色器，半分辨率渲染</td><td>加载失败时回退到 Canvas 2D 点阵</td></tr>
+          <tr><td>GSAP + ScrollTrigger</td><td class="mono">3.12.5 · cdnjs</td><td>标题逐字入场、滚动显现、Build Cycle 轨道随滚动填充、磁吸按钮</td><td>无库时保留 CSS 入场动画</td></tr>
+          <tr><td>Lenis</td><td class="mono">1.1.13 · unpkg</td><td>桌面端惯性平滑滚动</td><td>触屏和微信内置浏览器不启用</td></tr>
+          <tr><td>Geist / Geist Mono</td><td class="mono">Google Fonts</td><td>正文与等宽标注，替换原 Instrument Sans / JetBrains Mono</td><td>系统无衬线 / 等宽字体</td></tr>
+          <tr><td>Unbounded · Noto Sans SC</td><td class="mono">Google Fonts</td><td>英文展示字 · 中文全字重</td><td>系统字体</td></tr>
+          <tr><td>GSAP Flip</td><td class="mono">3.12.5 · cdnjs</td><td>项目广场筛选和卡片 / 列表视图切换时，卡片平滑移动到新位置</td><td>无库时直接切换</td></tr>
+          <tr><td>highlight.js</td><td class="mono">11.9.0 · cdnjs</td><td>教程代码高亮，自定义黑白主题：用字重、斜体、下划线区分语法，不用彩色</td><td>纯文本代码块</td></tr>
+          <tr><td>qrcode-generator</td><td class="mono">1.4.4 · cdnjs</td><td>加入成功后在成员卡背面生成可扫描的二维码，圆点模块 + 圆角定位点</td><td>示意图案</td></tr>
+          <tr><td>程序化材质</td><td class="mono">内联 CSS / SVG</td><td>颗粒、扫描线、网点、拉丝、铬、玻璃、十字标记网格</td><td>无需降级</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2 class="h2" style="font-size:24px;margin:56px 0 20px">落地注意</h2>
+      <div class="facts" style="margin-top:0">
+        <div><span class="mono mute">首屏性能</span><span>点阵 Canvas 在首帧后再启动，低端机和“减少动态效果”下自动关闭；字体用 display=swap，中文字体按需子集化。</span></div>
+        <div><span class="mono mute">合规文案</span><span>附属 Arc 前不出现 UNSW / Arc logo，不写“官方”“首个”“唯一”；赞助未确认不上页面。</span></div>
+        <div><span class="mono mute">数据来源</span><span>活动、项目、精选都放 Supabase 表，运营在后台直接编辑；报名和签到先用 Luma 或 Google Forms。</span></div>
+        <div><span class="mono mute">国内访问</span><span>寒假实测 Vercel 访问情况，不稳定就同步一份静态资料到国内可访问的地址。</span></div>
+      </div>
+    </div>
+  </section>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div><a href="#home" class="logo" style="color:var(--paper);padding:0"><span class="logo-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>BuilderSpace</a>
+        <p class="mute" style="font-size:13.5px;margin-top:14px;max-width:36ch">学生自发组织的中英双语创客社群，目前尚未附属 Arc。</p></div>
+      <div><h4 class="mono mute">逛逛</h4><a href="#events">活动</a><a href="#projects">项目广场</a><a href="#learn">教程资料</a></div>
+      <div><h4 class="mono mute">参与</h4><a href="#join">加入</a><a href="#join">提交项目卡</a><a href="#events">订阅日历</a></div>
+      <div><h4 class="mono mute">关注</h4><a href="#home">小红书</a><a href="#home">Instagram</a><a href="#home">Discord</a></div>
+    </div>
+    <div class="foot-ascii">
+      <div class="giant" aria-hidden="true" style="margin-top:0">BUILDER<br>SPACE</div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+        <pre class="ascii" id="ascii" aria-hidden="true"></pre>
+        <span class="mono mute">render · ascii · 60fps</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<nav class="dock" aria-label="底部导航">
+  <a href="#home" data-r="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11 12 4l9 7v9H3z"/></svg>首页</a>
+  <a href="#events" data-r="events"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>活动</a>
+  <a href="#projects" data-r="projects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>项目</a>
+  <a href="#learn" data-r="learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m8 8-5 4 5 4M16 8l5 4-5 4M14 4l-4 16"/></svg>教程</a>
+  <a href="#join" data-r="join"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"/></svg>加入</a>
+</nav>
+<div class="xy mono" id="xy" aria-hidden="true">X 0000 · Y 0000</div>
+
+<script>
+/* =====================================================================
+   HERO · Three.js 液态金属 + Bayer 1-bit 抖动
+   ===================================================================== */
+(() => {
+  const canvas = document.getElementById('gl');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!window.THREE || !canvas) { canvas && canvas.remove(); return; }
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' }); }
+  catch (e) { canvas.remove(); return; }
+  window.__glOn = true;
+  document.getElementById('field').style.display = 'none';
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const U = {
+    uTime: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) },
+    uMouse: { value: new THREE.Vector2(.7, .5) }, uShift: { value: 1.1 },
+    uDither: { value: 1 }, uScroll: { value: 0 }
+  };
+  const frag = `
+precision highp float;
+uniform float uTime, uShift, uDither, uScroll;
+uniform vec2 uRes, uMouse;
+float bayer2(vec2 a){ a = floor(a); return fract(dot(a, vec2(.5, a.y * .75))); }
+float bayer4(vec2 a){ return bayer2(.5 * a) * .25 + bayer2(a); }
+float bayer8(vec2 a){ return bayer4(.5 * a) * .25 + bayer2(a); }
+float smin(float a, float b, float k){ float h = clamp(.5 + .5 * (b - a) / k, 0., 1.); return mix(b, a, h) - k * h * (1. - h); }
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float map(vec3 p){
+  p.x -= uShift;
+  p *= 1.45;
+  float t = uTime * .35;
+  vec3 m = vec3((uMouse.x - .5) * 2.4, (uMouse.y - .5) * 2.4, .4);
+  float d = length(p - vec3(sin(t) * .9, cos(t * 1.3) * .45, sin(t * .7) * .4)) - .82;
+  d = smin(d, length(p - vec3(cos(t * .8) * 1.15, sin(t * 1.1) * .75, cos(t) * .5)) - .55, .65);
+  d = smin(d, length(p - vec3(sin(t * 1.7) * .55, sin(t * .9) * .95, .35)) - .44, .6);
+  d = smin(d, length(p - vec3(-cos(t * 1.2) * .7, -sin(t * .6) * .9, -.2)) - .5, .6);
+  d = smin(d, length(p - m) - .32, .75);
+  d += sin(p.x * 5. + uTime * .9) * sin(p.y * 5. + uTime * 1.1) * sin(p.z * 5. + uTime * .7) * .025;
+  return d / 1.45;
+}
+vec3 nrm(vec3 p){
+  const vec2 k = vec2(1., -1.); const float h = .002;
+  return normalize(k.xyy * map(p + k.xyy * h) + k.yyx * map(p + k.yyx * h) + k.yxy * map(p + k.yxy * h) + k.xxx * map(p + k.xxx * h));
+}
+float studio(vec3 r){
+  float top = smoothstep(.25, .32, r.y) * .95;
+  float strip = smoothstep(.55, .6, r.x) * smoothstep(.95, .6, r.x) * .8;
+  float back = smoothstep(.7, .9, -r.z) * .35;
+  float bands = (.5 + .5 * sin(r.y * 14. + uTime * .3)) * .08;
+  float horizon = exp(-abs(r.y + .05) * 18.) * .55;
+  return top + strip + back + bands + horizon + .03;
+}
+void main(){
+  vec2 uv = (gl_FragCoord.xy - .5 * uRes) / uRes.y;
+  uv.y += uScroll * .25;
+  vec3 ro = vec3(0., 0., 4.2);
+  vec3 rd = normalize(vec3(uv, -1.65));
+  float t = 0., d; bool hit = false;
+  // 包围球剔除：只有穿过金属球所在区域的像素才做光线步进
+  vec3 oc = ro - vec3(uShift, 0., 0.);
+  float b = dot(oc, rd), h = b * b - dot(oc, oc) + 1.75 * 1.75;
+  if (h > 0.) {
+    float tmax = -b + sqrt(h);
+    t = max(0., -b - sqrt(h));
+    for (int i = 0; i < 56; i++) {
+      d = map(ro + rd * t);
+      if (d < .0015) { hit = true; break; }
+      t += d * .92;
+      if (t > tmax) break;
+    }
+  }
+  float c;
+  if (hit) {
+    vec3 p = ro + rd * t, n = nrm(p), r = reflect(rd, n);
+    float fres = pow(1. + dot(rd, n), 3.);
+    c = studio(r) * .9 + fres * .55;
+    c *= .55 + .45 * clamp(dot(n, normalize(vec3(.4, .8, .6))), 0., 1.);
+    c += pow(max(dot(r, normalize(vec3(-.3, .7, .6))), 0.), 40.) * .9;
+  } else {
+    float g = exp(-length(uv - vec2(uShift * .32, 0.)) * 2.2) * .12;
+    c = g + (hash(gl_FragCoord.xy + floor(uTime * 12.)) - .5) * .03;
+  }
+  c = clamp(c, 0., 1.);
+  float dith = step(bayer8(gl_FragCoord.xy), pow(c, 1.15));
+  float o = mix(c, dith, uDither);
+  gl_FragColor = vec4(vec3(o) * vec3(.957, .957, .949), 1.);
+}`;
+  const mat = new THREE.ShaderMaterial({ uniforms: U, fragmentShader: frag, vertexShader: 'void main(){gl_Position=vec4(position,1.);}' });
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));
+
+  // 半分辨率渲染，CSS 放大 + pixelated，抖动颗粒清晰且省电
+  let PR = .5;
+  const size = () => {
+    const r = canvas.getBoundingClientRect();
+    renderer.setPixelRatio(PR);
+    renderer.setSize(r.width, r.height, false);
+    U.uRes.value.set(Math.floor(r.width * PR), Math.floor(r.height * PR));
+    U.uShift.value = r.width > 720 ? 1.27 * (r.width / r.height) * .52 : 0.;
+    const res = document.getElementById('res'); if (res) res.textContent = U.uRes.value.x + '×' + U.uRes.value.y;
+  };
+  const sizeAndDraw = () => { const r = canvas.getBoundingClientRect(); if (!r.width || !r.height) return; size(); renderer.render(scene, camera); };
+  new ResizeObserver(sizeAndDraw).observe(canvas);
+  sizeAndDraw();
+
+  const target = new THREE.Vector2(.7, .5);
+  const hero = document.querySelector('.hero');
+  hero.addEventListener('pointermove', e => {
+    const r = hero.getBoundingClientRect();
+    target.set((e.clientX - r.left) / r.width, 1 - (e.clientY - r.top) / r.height);
+  });
+  document.querySelectorAll('.rmode button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.rmode button').forEach(x => x.classList.toggle('on', x === b));
+    const to = +b.dataset.mode;
+    if (window.gsap) gsap.to(U.uDither, { value: to, duration: .8, ease: 'power2.inOut' }); else U.uDither.value = to;
+  }));
+
+  let visible = true, last = performance.now(), frames = 0, fpsT = last, slow = 0, lastScroll = 0, odd = false;
+  addEventListener('scroll', () => { lastScroll = performance.now(); }, { passive: true });
+  new IntersectionObserver(([en]) => { visible = en.isIntersecting; }).observe(hero);
+  const fpsEl = document.getElementById('fps');
+  const loop = now => {
+    requestAnimationFrame(loop);
+    const homeOn = document.getElementById('v-home').classList.contains('on');
+    if (!visible || !homeOn) return;
+    const raw = now - last;
+    // 滚动时隔帧渲染，把主线程让给滚动
+    if (now - lastScroll < 140) { odd = !odd; if (odd) return; }
+    const dt = Math.min(.05, raw / 1000); last = now;
+    // 自适应分辨率：连续掉帧就降低渲染分辨率
+    if (raw > 26 && raw < 200) { if (++slow > 45 && PR > .3) { PR = Math.round((PR - .08) * 100) / 100; slow = 0; size(); } } else slow = Math.max(0, slow - 1);
+    if (!reduce) U.uTime.value += dt;
+    U.uMouse.value.lerp(target, .06);
+    U.uScroll.value = Math.min(1, scrollY / innerHeight);
+    renderer.render(scene, camera);
+    frames++;
+    if (now - fpsT > 500) { if (fpsEl) fpsEl.textContent = Math.round(frames * 1000 / (now - fpsT)); frames = 0; fpsT = now; }
+  };
+  requestAnimationFrame(loop);
+})();
+</script>
+
+<script>
+(() => {
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------------- data（示例，正式版来自 Supabase） ---------------- */
+const STATUS = { recruit: ['招募中', 'st-recruit'], build: ['进行中', 'st-build'], demo: ['已 Demo', 'st-demo'], pause: ['暂停', 'st-pause'] };
+const PROJECTS = [
+  { id: 'coursemate', name: 'CourseMate', s: 'build', prob: '选课前想知道一门课的真实工作量，现在只能翻群聊记录。', user: '授课型硕士新生', need: ['试用者', '后端'], prog: 4, team: ['BL', 'HX'], more: 2, upd: '2 天前' },
+  { id: 'flatmate', name: '合租雷达', s: 'recruit', prob: '找室友靠小红书刷帖，信息过期、没法按通勤筛。', user: '悉尼留学生', need: ['前端', '设计'], prog: 1, team: ['YK'], more: 0, upd: '今天' },
+  { id: 'menu', name: 'Menu Lens', s: 'demo', prob: '看不懂英文菜单和过敏原标注，点菜靠猜。', user: '刚到澳洲的同学', need: ['产品/商科'], prog: 6, team: ['LZ', 'MW'], more: 1, upd: '5 天前' },
+  { id: 'study', name: 'Study Pact', s: 'recruit', prob: '考前自习总是一个人拖延，想找同课程的人互相监督。', user: 'CS / 数据类本科', need: ['后端', '设计', '前端'], prog: 1, team: ['JC'], more: 0, upd: '昨天' },
+  { id: 'resume', name: 'Demo2CV', s: 'build', prob: '做完的项目不知道怎么写进英文简历和 LinkedIn。', user: '找实习的硕士', need: ['试用者'], prog: 3, team: ['EV', 'QS'], more: 0, upd: '3 天前' },
+  { id: 'receipt', name: '小票分账', s: 'pause', prob: '合租买菜 AA，每次算账都要翻聊天记录。', user: '合租同学', need: ['前端'], prog: 2, team: ['TT'], more: 0, upd: '3 周前' }
+];
+const EVENTS = [
+  { d: '10/21', w: '周三', t: 'ws', title: 'Vibe Coding 101：两小时做出第一个页面', where: '校内教室 · 报名后通知', tag: '工作坊', len: '2h', v: 2 },
+  { d: '10/28', w: '周三', t: 'build', title: 'Build Night #1 · 组队 Pitch', where: '线下 18:30 · 周一线上预热', tag: 'Build Night', len: '2.5h', v: 4 },
+  { d: '11/04', w: '周三', t: 'demo', title: 'Demo Night 1 · 第一批原型', where: '线下 · 欢迎 CSESoc / DevSoc 同学', tag: 'Demo Night', len: '2h', v: 0 },
+  { d: '11/11', w: '周三', t: 'build', title: 'Build Night #3 · 中期检查', where: '线下 18:30', tag: 'Build Night', len: '2.5h', v: 4 },
+  { d: '11/18', w: '周三', t: 'demo', title: 'Demo Night 2 · 本学期最后一场线下', where: '线下 · 3 分钟英文演示', tag: 'Demo Night', len: '2h', v: 5 },
+  { d: '11/26', w: '周四', t: 'online', title: '考试周线上答疑 · 悉尼 21:00 / 北京 18:00', where: '线上 · 腾讯会议 / Zoom', tag: '线上', len: '1h', v: 1 }
+];
+
+/* ---------------- project cards ---------------- */
+const card = p => {
+  const [label, dot] = STATUS[p.s];
+  const bars = Array.from({ length: 6 }, (_, i) => `<i class="${i < p.prog ? 'f' : ''}"></i>`).join('');
+  const av = p.team.map(t => `<b>${t}</b>`).join('') + (p.more ? `<b class="o">+${p.more}</b>` : '');
+  const idx = PROJECTS.indexOf(p);
+  return `<article class="pcard${p.s === 'pause' ? ' st-pause-card' : ''}" tabindex="0" data-s="${p.s}" data-roles="${p.need.join(',')}" data-id="${p.id}">
+    <div class="cover" data-v="${idx % 6}" aria-hidden="true"><span class="ini">${p.name.slice(0, 2)}</span><span class="id">BS-${String(idx + 1).padStart(3, '0')}</span></div>
+    <div class="pcard-top"><span class="tag"><i class="st-dot ${dot}"></i>${label}</span><span class="mono mute">${p.upd}</span></div>
+    <div><h3>${p.name}</h3><p class="prob" style="margin-top:8px">${p.prob}</p></div>
+    <div style="display:flex;flex-direction:column;gap:8px"><span class="mono mute">缺 · ${p.user}</span><div class="need">${p.need.map(n => `<span class="tag dash">${n}</span>`).join('')}</div></div>
+    <div><span class="mono mute" style="display:block;margin-bottom:6px">进度 ${p.prog}/6 周</span><div class="prog">${bars}</div></div>
+    <div class="pcard-foot"><span class="avatar">${av}</span><span>查看 →</span></div>
+  </article>`;
+};
+$('#featured').innerHTML = PROJECTS.filter(p => p.s !== 'pause').slice(0, 3).map(card).join('');
+$('#plaza').innerHTML = PROJECTS.map(card).join('');
+
+const bindCards = root => $$('.pcard', root).forEach(c => {
+  c.addEventListener('pointermove', e => {
+    const r = c.getBoundingClientRect();
+    c.style.setProperty('--mx', e.clientX - r.left + 'px');
+    c.style.setProperty('--my', e.clientY - r.top + 'px');
+  });
+  const go = () => { location.hash = 'project'; };
+  c.addEventListener('click', go);
+  c.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+});
+bindCards(document);
+
+/* filters */
+let fs = 'all', fr = 'all';
+$$('#fStatus .chip').forEach(b => {
+  const s = b.dataset.s;
+  b.querySelector('.n').textContent = s === 'all' ? PROJECTS.length : PROJECTS.filter(p => p.s === s).length;
+});
+const applyFilter = () => {
+  const cards = $$('#plaza .pcard');
+  const state = window.Flip && !reduce ? Flip.getState(cards) : null;
+  let shown = 0;
+  cards.forEach(c => {
+    const ok = (fs === 'all' || c.dataset.s === fs) && (fr === 'all' || c.dataset.roles.split(',').includes(fr));
+    c.classList.toggle('hide', !ok);
+    if (ok) shown++;
+  });
+  $('#empty').hidden = shown > 0;
+  const pc = $('#pCount'); if (pc) pc.textContent = shown;
+  if (state) Flip.from(state, { duration: .6, ease: 'expo.out', absolute: true, stagger: .03,
+    onEnter: els => gsap.fromTo(els, { opacity: 0, scale: .94 }, { opacity: 1, scale: 1, duration: .5, ease: 'expo.out' }),
+    onLeave: els => gsap.to(els, { opacity: 0, scale: .94, duration: .3 }) });
+};
+const chipGroup = (sel, cb) => $$(sel).forEach(b => b.addEventListener('click', () => {
+  $$(sel).forEach(x => x.classList.remove('on')); b.classList.add('on'); cb(b);
+}));
+chipGroup('#fStatus .chip', b => { fs = b.dataset.s; applyFilter(); });
+chipGroup('#fRole .chip', b => { fr = b.dataset.role; applyFilter(); });
+
+/* events */
+const renderEvents = f => {
+  const list = EVENTS.filter(e => f === 'all' || e.t === f);
+  $('#evlist').innerHTML = list.map(e => `
+    <a class="ev" href="#join" data-v="${e.v}" data-tag="${e.tag}">
+      <span class="ev-i mono mute">${String(EVENTS.indexOf(e) + 1).padStart(2, '0')}</span>
+      <div class="ev-date">${e.d}<small class="mute">${e.w}</small></div>
+      <div class="ev-main"><h3>${e.title}</h3><div class="ev-meta"><span class="tag">${e.tag}</span><span class="mono mute">${e.len}</span></div></div>
+      <div class="ev-where mute">${e.where}</div>
+      <span class="ev-go" aria-hidden="true">↗</span>
+    </a>`).join('') || '<p class="mono mute" style="padding:32px 0">这类活动还没排期</p>';
+  if (window.gsap && !reduce) gsap.from('#evlist .ev', { y: 24, opacity: .2, duration: .6, stagger: .05, ease: 'expo.out', clearProps: 'all' });
+};
+renderEvents('all');
+chipGroup('[data-ef]', b => renderEvents(b.dataset.ef));
+
+/* heatmap */
+$('#heat').innerHTML = Array.from({ length: 56 }, (_, i) => {
+  const v = i < 14 ? 0 : (Math.sin(i * 1.7) + Math.cos(i * .6) + i / 30);
+  const l = v > 1.6 ? 'l3' : v > .9 ? 'l2' : v > .2 ? 'l1' : '';
+  return `<i class="${l}"></i>`;
+}).join('');
+
+/* ---------------- text scramble ---------------- */
+const GLYPHS = '!<>-_\\/[]{}—=+*^?#01';
+const scramble = el => {
+  if (reduce) return;
+  const final = el.dataset.final || (el.dataset.final = el.textContent);
+  let frame = 0; const total = 28;
+  const tick = () => {
+    el.textContent = [...final].map((ch, i) => {
+      if (ch === ' ') return ' ';
+      return frame / total > i / final.length ? ch : GLYPHS[(Math.random() * GLYPHS.length) | 0];
+    }).join('');
+    if (++frame <= total) requestAnimationFrame(tick); else el.textContent = final;
+  };
+  tick();
+};
+
+/* ---------------- counters / bars ---------------- */
+const countUp = el => {
+  const to = +el.dataset.count;
+  if (reduce) { el.textContent = to; return; }
+  const t0 = performance.now(), dur = 1400;
+  const step = t => {
+    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 4);
+    el.textContent = Math.round(to * e);
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+};
+const animateView = v => {
+  $$('[data-scramble]', v).forEach(scramble);
+  $$('[data-count]', v).forEach(countUp);
+  $$('.bar i', v).forEach(b => { b.style.width = '0'; requestAnimationFrame(() => requestAnimationFrame(() => { b.style.width = b.dataset.w + '%'; })); });
+  const rail = $('.cycle-rail i', v);
+  if (rail && !window.gsap) { const vert = matchMedia('(max-width:720px)').matches; rail.style.transform = vert ? 'scaleY(0)' : 'scaleX(0)'; setTimeout(() => { rail.style.transform = vert ? 'scaleY(.42)' : 'scaleX(.42)'; }, 300); }
+  if (v.id === 'v-learn') typeTerm();
+};
+setInterval(() => { const el = $('[data-loop]'); if (el && el.offsetParent) countUp(el); }, 3200);
+
+/* ---------------- terminal typewriter ---------------- */
+const TERM = [
+  ['c', '# 1. 先拆需求，再让 AI 写'],
+  ['', '$ npx create-next-app my-first-page'],
+  ['', '$ claude "做一个活动报名页，字段：昵称、专业"'],
+  ['c', '# 2. 逐行读懂，改掉不需要的'],
+  ['', '$ npm run dev'],
+  ['ok', '✓ Ready on http://localhost:3000'],
+  ['', '$ vercel --prod'],
+  ['ok', '✓ Deployed → my-first-page.vercel.app']
+];
+let typing = false;
+function typeTerm() {
+  const box = $('.tw'); if (!box || typing) return;
+  typing = true; box.innerHTML = '';
+  if (reduce) { box.innerHTML = TERM.map(([c, t]) => `<div class="${c}">${t}</div>`).join(''); typing = false; return; }
+  let li = 0, ci = 0, line;
+  const next = () => {
+    if (li >= TERM.length) { typing = false; return; }
+    const [cls, txt] = TERM[li];
+    if (ci === 0) { line = document.createElement('div'); line.className = cls; box.appendChild(line); }
+    line.textContent = txt.slice(0, ++ci);
+    if (ci >= txt.length) { li++; ci = 0; setTimeout(next, cls === 'ok' ? 380 : 220); }
+    else setTimeout(next, cls ? 8 : 22);
+  };
+  next();
+}
+
+/* ---------------- countdown（悉尼 AEDT, UTC+11） ---------------- */
+const target = Date.UTC(2026, 9, 21, 7, 30);
+const pad = n => String(n).padStart(2, '0');
+const cd = () => {
+  let ms = Math.max(0, target - Date.now());
+  const d = Math.floor(ms / 864e5); ms -= d * 864e5;
+  const h = Math.floor(ms / 36e5); ms -= h * 36e5;
+  const m = Math.floor(ms / 6e4); ms -= m * 6e4;
+  const s = Math.floor(ms / 1e3);
+  const set = (u, v) => { const el = $(`#cd [data-u="${u}"]`); if (el.textContent !== v) { el.textContent = v; if (!reduce && u === 's') el.animate([{ transform: 'translateY(-30%)', opacity: .3 }, { transform: 'none', opacity: 1 }], { duration: 300, easing: 'ease-out' }); } };
+  set('d', pad(d)); set('h', pad(h)); set('m', pad(m)); set('s', pad(s));
+};
+cd(); setInterval(cd, 1000);
+
+/* ---------------- dot field (hero) ---------------- */
+const cv = $('#field'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, dots = [], mouse = { x: -999, y: -999 }, running = false, raf;
+const GAP = 22;
+const resize = () => {
+  const r = cv.getBoundingClientRect();
+  DPR = Math.min(2, devicePixelRatio || 1);
+  W = r.width; H = r.height;
+  cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  dots = [];
+  for (let y = GAP / 2; y < H; y += GAP) for (let x = GAP / 2; x < W; x += GAP) dots.push({ x, y, ox: x, oy: y, vx: 0, vy: 0 });
+};
+const draw = t => {
+  ctx.clearRect(0, 0, W, H);
+  const R = 140;
+  for (const d of dots) {
+    const dx = d.x - mouse.x, dy = d.y - mouse.y, dist = Math.hypot(dx, dy);
+    if (dist < R) { const f = (1 - dist / R) * 2.4; d.vx += dx / dist * f; d.vy += dy / dist * f; }
+    d.vx += (d.ox - d.x) * .06; d.vy += (d.oy - d.y) * .06;
+    d.vx *= .82; d.vy *= .82; d.x += d.vx; d.y += d.vy;
+    const wave = .5 + .5 * Math.sin(d.ox * .012 + d.oy * .018 - t * .0012);
+    const near = dist < R ? 1 - dist / R : 0;
+    const fade = Math.min(1, d.oy / H * 1.4) * (0.35 + 0.65 * (d.ox / W));
+    ctx.globalAlpha = Math.min(1, (.08 + wave * .22 + near * .9) * fade);
+    ctx.fillStyle = '#f4f4f2';
+    const s = 1.1 + near * 1.8;
+    ctx.fillRect(d.x - s / 2, d.y - s / 2, s, s);
+  }
+  ctx.globalAlpha = 1;
+  if (running) raf = requestAnimationFrame(draw);
+};
+const startField = () => { if (running || window.__glOn) return; resize(); if (reduce) { draw(0); return; } running = true; raf = requestAnimationFrame(draw); };
+const stopField = () => { running = false; cancelAnimationFrame(raf); };
+addEventListener('resize', () => { if ($('#v-home').classList.contains('on')) resize(); });
+$('.hero').addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; });
+$('.hero').addEventListener('pointerleave', () => { mouse.x = mouse.y = -999; });
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopField(); else if ($('#v-home').classList.contains('on')) startField(); });
+
+/* ---------------- router ---------------- */
+const ROUTES = ['home', 'events', 'projects', 'project', 'learn', 'join', 'spec'];
+const route = () => {
+  const r = ROUTES.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'home';
+  $$('.view').forEach(v => v.classList.toggle('on', v.dataset.view === r));
+  const navKey = r === 'project' ? 'projects' : r;
+  $$('[data-r]').forEach(a => a.classList.toggle('on', a.dataset.r === navKey));
+  const v = $(`#v-${r}`);
+  scrollTo(0, 0);
+  if (r === 'home') requestAnimationFrame(startField); else stopField();
+  animateView(v);
+};
+addEventListener('hashchange', route);
+route();
+
+/* ---------------- join form ---------------- */
+$$('[data-multi] .chip').forEach(b => b.addEventListener('click', () => b.classList.toggle('on')));
+const drawQR = () => {
+  const q = $('#qr').getContext('2d'), N = 29;
+  q.fillStyle = '#fff'; q.fillRect(0, 0, N, N); q.fillStyle = '#050505';
+  let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (rnd() > .52) q.fillRect(x, y, 1, 1);
+  const finder = (ox, oy) => { q.fillStyle = '#050505'; q.fillRect(ox, oy, 7, 7); q.fillStyle = '#fff'; q.fillRect(ox + 1, oy + 1, 5, 5); q.fillStyle = '#050505'; q.fillRect(ox + 2, oy + 2, 3, 3); q.fillStyle = '#fff'; };
+  q.fillStyle = '#fff'; q.fillRect(0, 0, 8, 8); q.fillRect(N - 8, 0, 8, 8); q.fillRect(0, N - 8, 8, 8);
+  finder(0, 0); finder(N - 7, 0); finder(0, N - 7);
+};
+$('#joinForm').addEventListener('submit', e => {
+  e.preventDefault();
+  $('#s2').classList.add('on');
+  setTimeout(() => { $('#s3').classList.add('on'); $('#formBody').hidden = true; $('#formDone').hidden = false; drawQR(); }, 450);
+});
+$('#again').addEventListener('click', () => { $('#formBody').hidden = false; $('#formDone').hidden = true; $('#s2').classList.remove('on'); $('#s3').classList.remove('on'); });
+
+/* copy ics */
+$('#copyIcs').addEventListener('click', e => {
+  const b = e.currentTarget, txt = $('#ics').textContent;
+  const done = () => { b.textContent = '已复制'; setTimeout(() => b.textContent = '复制链接', 1600); };
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).then(done).catch(() => { getSelection().selectAllChildren($('#ics')); b.textContent = '已选中，请手动复制'; });
+  else getSelection().selectAllChildren($('#ics'));
+});
+
+/* ---------------- language toggle ---------------- */
+const I18N = [
+  ['.nav [data-r="home"]', '首页', 'Home'], ['.nav [data-r="events"]', '活动', 'Events'], ['.nav [data-r="projects"]', '项目广场', 'Projects'],
+  ['.nav [data-r="learn"]', '教程资料', 'Learn'], ['.nav [data-r="spec"]', '设计说明', 'Spec']
+];
+const heroZh = $('.hero-zh').innerHTML;
+const heroEn = 'Bring an idea, leave with <b>a working page</b> in two hours.<br><span class="mute" style="font-size:.72em;font-weight:400">A bilingual maker club started at UNSW. Learn vibe coding, find teammates, and build together every week.</span>';
+$$('[data-lang]').forEach(b => b.addEventListener('click', () => {
+  const en = b.dataset.lang === 'en';
+  $$('[data-lang]').forEach(x => x.classList.toggle('on', x === b));
+  I18N.forEach(([s, zh, e]) => { const el = $(s); if (el) el.textContent = en ? e : zh; });
+  $('.hero-zh').innerHTML = en ? heroEn : heroZh;
+  document.documentElement.lang = en ? 'en' : 'zh-CN';
+}));
+
+/* ---------------- cursor coordinates ---------------- */
+const xy = $('#xy');
+addEventListener('pointermove', e => { xy.textContent = `X ${String(e.clientX).padStart(4, '0')} · Y ${String(Math.round(e.clientY + scrollY)).padStart(4, '0')}`; }, { passive: true });
+})();
+</script>
+<script>
+/* =====================================================================
+   MOTION LAYER · GSAP / ScrollTrigger / Lenis / cursor / boot / ascii
+   ===================================================================== */
+(() => {
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fine = matchMedia('(pointer: fine)').matches;
+const hasGsap = !!window.gsap;
+if (hasGsap && window.ScrollTrigger) gsap.registerPlugin(ScrollTrigger);
+
+/* ---------- boot sequence ---------- */
+const boot = $('#boot');
+let seen = false;
+try { seen = sessionStorage.getItem('bs-boot') === '1'; sessionStorage.setItem('bs-boot', '1'); } catch (e) {}
+if (reduce || seen) boot.remove();
+else {
+  const LOG = ['mount  grid.blueprint', 'load   mat.noise / mat.scan / mat.halftone', 'load   mat.chrome / mat.glass', 'compile shader.dither.bayer8', 'fetch  cycle_01 · 6 projects', 'ready'];
+  const num = $('#bootNum'), log = $('#bootLog');
+  const t0 = performance.now(), dur = 1100;
+  const tick = now => {
+    const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    num.textContent = String(Math.round(e * 100)).padStart(3, '0');
+    const n = Math.ceil(e * LOG.length);
+    if (log.children.length < n) { const d = document.createElement('div'); d.textContent = '› ' + LOG[log.children.length]; log.appendChild(d); }
+    if (k < 1) requestAnimationFrame(tick);
+    else setTimeout(() => { boot.classList.add('done'); setTimeout(() => boot.remove(), 1000); intro(); }, 120);
+  };
+  requestAnimationFrame(tick);
+}
+
+/* ---------- HUD corners on key surfaces ---------- */
+$$('.next, .lcard, .form, .box').forEach(el => {
+  el.classList.add('hud');
+  ['tl', 'tr', 'bl', 'br'].forEach(c => { const s = document.createElement('span'); s.className = 'c ' + c; el.appendChild(s); });
+});
+
+/* ---------- clocks ---------- */
+const fmt = (tz, sec) => new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', second: sec ? '2-digit' : undefined, hour12: false }).format(new Date());
+const clock = () => { const a = $('#sydTime'), b = $('#bjTime'); if (a) a.textContent = fmt('Australia/Sydney', true); if (b) b.textContent = fmt('Asia/Shanghai', false); };
+clock(); setInterval(clock, 1000);
+
+/* ---------- custom cursor + magnetic buttons ---------- */
+if (fine && !reduce) {
+  document.documentElement.classList.add('has-cursor');
+  const cur = $('#cur'), ring = $('#curRing');
+  let x = innerWidth / 2, y = innerHeight / 2, rx = x, ry = y;
+  addEventListener('pointermove', e => { document.documentElement.classList.add('cur-live'); x = e.clientX; y = e.clientY; cur.style.transform = `translate(${x}px,${y}px)`; }, { passive: true });
+  const follow = () => { rx += (x - rx) * .18; ry += (y - ry) * .18; ring.style.transform = `translate(${rx}px,${ry}px)`; requestAnimationFrame(follow); };
+  follow();
+  document.addEventListener('pointerover', e => { ring.classList.toggle('big', !!e.target.closest('a, button, .pcard, .chip, .ev')); });
+  $$('.btn').forEach(b => {
+    b.addEventListener('pointermove', e => {
+      const r = b.getBoundingClientRect();
+      const dx = (e.clientX - r.left - r.width / 2) * .25, dy = (e.clientY - r.top - r.height / 2) * .35;
+      b.style.transform = `translate(${dx}px,${dy}px)`;
+    });
+    b.addEventListener('pointerleave', () => { b.style.transition = 'transform .6s cubic-bezier(.2,.7,.1,1),color .35s'; b.style.transform = ''; setTimeout(() => b.style.transition = '', 600); });
+  });
+}
+
+/* ---------- Lenis smooth scroll (desktop only) ---------- */
+let lenis = null;
+if (window.Lenis && fine && !reduce) {
+  lenis = new Lenis({ lerp: .11, wheelMultiplier: 1, smoothWheel: true, syncTouch: false });
+  if (hasGsap && window.ScrollTrigger) { lenis.on('scroll', ScrollTrigger.update); gsap.ticker.add(t => lenis.raf(t * 1000)); gsap.ticker.lagSmoothing(0); }
+  else { const r = t => { lenis.raf(t); requestAnimationFrame(r); }; requestAnimationFrame(r); }
+  addEventListener('hashchange', () => lenis.scrollTo(0, { immediate: true }));
+}
+
+/* ---------- split headings into chars ---------- */
+const split = el => {
+  if (el.dataset.split) return;
+  el.dataset.split = '1';
+  const walk = node => {
+    [...node.childNodes].forEach(n => {
+      if (n.nodeType === 3) {
+        const frag = document.createDocumentFragment();
+        [...n.textContent].forEach(ch => {
+          const s = document.createElement('span');
+          s.className = 'ch'; s.style.display = 'inline-block'; s.style.whiteSpace = 'pre';
+          s.textContent = ch; frag.appendChild(s);
+        });
+        n.replaceWith(frag);
+      } else if (n.nodeType === 1 && !n.matches('br')) walk(n);
+    });
+  };
+  walk(el);
+};
+
+/* ---------- per-view scroll choreography ---------- */
+let triggers = [];
+const choreo = () => {
+  if (!hasGsap || reduce) return;
+  triggers.forEach(t => t.kill()); triggers = [];
+  const v = $('.view.on'); if (!v) return;
+
+  $$('.h2', v).forEach(h => {
+    split(h);
+    const tw = gsap.from($$('.ch', h), { yPercent: 60, rotate: 4, opacity: .2, duration: .9, ease: 'expo.out', stagger: .012,
+      scrollTrigger: { trigger: h, start: 'top 88%', once: true } });
+    triggers.push(tw.scrollTrigger);
+  });
+  $$('.pillars, .cycle, .metrics, .grid-p, .next, .learn, .digest, .weeks, .ev-list, .fields, .tl, .mats, .tbl-wrap, .motion', v).forEach(el => {
+    const kids = el.children.length > 1 && !el.matches('.next, .tbl-wrap') ? [...el.children].filter(c => !c.matches('.cycle-rail, .c')) : [el];
+    const tw = gsap.from(kids, { y: 40, opacity: .2, duration: .9, ease: 'expo.out', stagger: .06,
+      scrollTrigger: { trigger: el, start: 'top 90%', once: true }, clearProps: 'transform,opacity' });
+    triggers.push(tw.scrollTrigger);
+  });
+
+  // Build Cycle 轨道随滚动填充，节点依次点亮
+  const cyc = $('.cycle', v);
+  if (cyc && window.ScrollTrigger) {
+    const rail = $('.cycle-rail i', cyc), steps = $$('.step', cyc);
+    const vert = matchMedia('(max-width:720px)').matches;
+    const st = ScrollTrigger.create({ trigger: cyc, start: 'top 75%', end: 'bottom 45%', scrub: .6,
+      onUpdate: s => {
+        rail.style.transition = 'none';
+        rail.style.transform = vert ? `scaleY(${s.progress})` : `scaleX(${s.progress})`;
+        steps.forEach((el, i) => el.classList.toggle('done', s.progress >= i / (steps.length - 1) - .001));
+        const first = steps.find(el => !el.classList.contains('done'));
+        steps.forEach(el => el.classList.toggle('now', el === first));
+      } });
+    triggers.push(st);
+  }
+
+  // 首屏随滚动视差
+  const hero = $('.hero .wrap', v);
+  if (hero) {
+    const tw = gsap.to(hero, { yPercent: -18, opacity: .2, ease: 'none', scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true } });
+    triggers.push(tw.scrollTrigger);
+  }
+  ScrollTrigger.refresh();
+};
+
+/* ---------- ticker reacts to scroll velocity ---------- */
+if (hasGsap && window.ScrollTrigger && !reduce) {
+  const track = $('.ticker-wrap');
+  let skew = 0;
+  ScrollTrigger.create({ onUpdate: s => {
+    const v = gsap.utils.clamp(-12, 12, s.getVelocity() / -250);
+    if (Math.abs(v) > Math.abs(skew)) { skew = v; gsap.to(track, { skewX: skew, duration: .3, overwrite: true, onComplete: () => { skew = 0; gsap.to(track, { skewX: 0, duration: .8, ease: 'power3' }); } }); }
+  } });
+}
+
+/* ---------- intro (after boot) ---------- */
+function intro() {
+  if (!hasGsap || reduce) return;
+  gsap.from('.readout, .scrollcue', { opacity: 0, y: 10, duration: 1, stagger: .1, ease: 'power3.out', delay: .2 });
+  gsap.from('.top', { yPercent: -100, duration: 1, ease: 'expo.out' });
+}
+if (!document.getElementById('boot')) intro();
+
+addEventListener('hashchange', () => setTimeout(choreo, 30));
+choreo();
+
+/* ---------- ASCII torus (footer + swatch) ---------- */
+const CH = '.,-~:;=!*#$@';
+const torus = (A, B, w, h) => {
+  const out = new Array(w * h).fill(' '), z = new Array(w * h).fill(0);
+  const cA = Math.cos(A), sA = Math.sin(A), cB = Math.cos(B), sB = Math.sin(B);
+  for (let j = 0; j < 6.28; j += .07) {
+    const ct = Math.cos(j), st = Math.sin(j);
+    for (let i = 0; i < 6.28; i += .02) {
+      const sp = Math.sin(i), cp = Math.cos(i), hh = ct + 2, D = 1 / (sp * hh * sA + st * cA + 5), t = sp * hh * cA - st * sA;
+      const x = 0 | (w / 2 + w * .38 * D * (cp * hh * cB - t * sB)), y = 0 | (h / 2 + h * .75 * D * (cp * hh * sB + t * cB));
+      const o = x + w * y, N = 0 | (8 * ((st * sA - sp * ct * cA) * cB - sp * ct * sA - st * cA - cp * ct * sB));
+      if (y >= 0 && y < h && x >= 0 && x < w && D > z[o]) { z[o] = D; out[o] = CH[N > 0 ? N : 0]; }
+    }
+  }
+  let s = ''; for (let k = 0; k < h; k++) s += out.slice(k * w, k * w + w).join('') + '\n';
+  return s;
+};
+const asc = [[$('#ascii'), 64, 30], [$('#asciiSw'), 40, 18]];
+let A = 1, B = 1, asciiOn = new Set();
+asc.forEach(([el]) => el && new IntersectionObserver(([en]) => { en.isIntersecting ? asciiOn.add(el) : asciiOn.delete(el); }).observe(el));
+asc.forEach(([el, w, h]) => { if (el) el.textContent = torus(A, B, w, h); });
+setInterval(() => {
+  if (reduce || !asciiOn.size) return;
+  A += .05; B += .03;
+  asc.forEach(([el, w, h]) => { if (el && asciiOn.has(el)) el.textContent = torus(A, B, w, h); });
+}, 50);
+
+/* ---------- dither swatch ---------- */
+const ds = $('#ditherSw');
+if (ds) {
+  const g = ds.getContext('2d'), img = g.createImageData(ds.width, ds.height);
+  const bayer = (x, y) => { let v = 0; for (let i = 0; i < 3; i++) { const bx = (x >> i) & 1, by = (y >> i) & 1; v = (v << 2) | (((bx ^ by) << 1) | by); } return v / 64; };
+  for (let y = 0; y < ds.height; y++) for (let x = 0; x < ds.width; x++) {
+    const lum = x / ds.width, b = bayer(x, y), on = lum > b ? 244 : 5, k = (y * ds.width + x) * 4;
+    img.data[k] = img.data[k + 1] = img.data[k + 2] = on; img.data[k + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+}
+})();
+</script>
+<script>
+/* =====================================================================
+   v3 · nav pill / scroll progress / header auto-hide / card tilt
+   ===================================================================== */
+(() => {
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// nav pill follows the active link, previews on hover
+const nav = $('.nav'), pill = $('.nav-pill');
+const moveTo = a => { if (!a) { pill.style.width = '0'; return; } pill.style.width = a.offsetWidth + 'px'; pill.style.transform = `translateX(${a.offsetLeft}px)`; };
+const active = () => $('.nav a.on');
+const sync = () => moveTo(active());
+$$('.nav a').forEach(a => {
+  a.addEventListener('pointerenter', () => { moveTo(a); $$('.nav a').forEach(x => x.style.color = x === a ? 'var(--ink)' : ''); });
+});
+nav.addEventListener('pointerleave', () => { sync(); $$('.nav a').forEach(x => x.style.color = ''); });
+addEventListener('hashchange', () => requestAnimationFrame(sync));
+addEventListener('resize', sync);
+document.fonts && document.fonts.ready.then(sync);
+sync();
+
+// scroll progress + header hide on scroll down (one rAF per frame)
+const bar = $('#prog'), top = $('.top');
+let lastY = scrollY, ticking = false;
+const onScroll = () => {
+  const y = scrollY, max = document.documentElement.scrollHeight - innerHeight;
+  bar.style.transform = `scaleX(${max > 0 ? Math.min(1, y / max) : 0})`;
+  if (Math.abs(y - lastY) > 6) { top.classList.toggle('hide', y > lastY && y > 240); lastY = y; }
+  ticking = false;
+};
+addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
+addEventListener('hashchange', () => { top.classList.remove('hide'); lastY = 0; });
+
+// 3D tilt on project cards (pointer devices only)
+if (matchMedia('(pointer: fine)').matches && !reduce) {
+  document.addEventListener('pointermove', e => {
+    const c = e.target.closest && e.target.closest('.pcard'); if (!c) return;
+    const r = c.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - .5, py = (e.clientY - r.top) / r.height - .5;
+    c.style.setProperty('--rx', (-py * 7).toFixed(2) + 'deg');
+    c.style.setProperty('--ry', (px * 9).toFixed(2) + 'deg');
+  }, { passive: true });
+  document.addEventListener('pointerout', e => {
+    const c = e.target.closest && e.target.closest('.pcard');
+    if (c && !c.contains(e.relatedTarget)) { c.style.setProperty('--rx', '0deg'); c.style.setProperty('--ry', '0deg'); }
+  });
+}
+})();
+</script>
+<script>
+/* =====================================================================
+   v4 · 内页交互：校历标记 / 活动预览 / 项目分布与视图切换 / 详情 / 代码高亮 / 成员卡表单
+   ===================================================================== */
+(() => {
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fine = matchMedia('(pointer: fine)').matches;
+if (window.gsap && window.Flip) gsap.registerPlugin(Flip);
+
+/* ---------- events: today marker on the 8-week strip ---------- */
+const START = Date.UTC(2026, 9, 11, 13);          // 10/12 00:00 悉尼
+const span = 56 * 864e5;
+const today = $('#todayMark');
+if (today) {
+  const k = Math.max(0, Math.min(1, (Date.now() - START) / span));
+  today.style.left = (k * 100) + '%';
+  const d = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', month: 'numeric', day: 'numeric' }).format(new Date()).split('/');
+  today.querySelector('em').textContent = `今天 ${d[1]}/${d[0]}`;
+}
+
+/* ---------- events: floating preview follows the cursor ---------- */
+const peek = $('#evPeek');
+if (peek && fine && !reduce) {
+  const INI = { 'Build Night': 'BN', 'Demo Night': 'DN', '工作坊': 'WS', '线上': 'ON' };
+  let tx = 0, ty = 0, px = 0, py = 0, on = false;
+  const list = $('#evlist');
+  list.addEventListener('pointermove', e => {
+    const row = e.target.closest('.ev'); if (!row) return;
+    tx = e.clientX + 150; ty = e.clientY;
+    if (!on) { px = tx; py = ty; on = true; peek.classList.add('on'); }
+    const cov = peek.querySelector('.cover');
+    if (cov.dataset.v !== row.dataset.v) cov.dataset.v = row.dataset.v;
+    peek.querySelector('.ini').textContent = INI[row.dataset.tag] || 'BS';
+    peek.querySelector('.peek-t').textContent = row.querySelector('.ev-date').firstChild.textContent + ' · ' + row.dataset.tag;
+  });
+  list.addEventListener('pointerleave', () => { on = false; peek.classList.remove('on'); });
+  const follow = () => { px += (tx - px) * .16; py += (ty - py) * .16; peek.style.left = px + 'px'; peek.style.top = py + 'px'; requestAnimationFrame(follow); };
+  follow();
+}
+
+/* ---------- projects: status distribution, stats, add-card, layout toggle ---------- */
+const plaza = $('#plaza');
+const cards = $$('#plaza .pcard');
+const by = s => cards.filter(c => c.dataset.s === s).length;
+const LABEL = { recruit: '招募中', build: '进行中', demo: '已 Demo', pause: '暂停' };
+$('#dist').innerHTML = Object.keys(LABEL).map(s => `<div class="d-${s}" style="flex:${Math.max(by(s), .4)} 1 0"><i class="st-dot st-${s}"></i><b>${by(s)}</b><span class="mute">${LABEL[s]}</span></div>`).join('');
+const roles = {};
+cards.forEach(c => c.dataset.roles.split(',').forEach(r => { roles[r] = (roles[r] || 0) + 1; }));
+const top = Object.entries(roles).sort((a, b) => b[1] - a[1])[0];
+$('#stTotal').textContent = cards.length; $('#pAll').textContent = cards.length; $('#pCount').textContent = cards.length;
+$('#stRecruit').textContent = by('recruit');
+if (top) $('#stRole').textContent = `${top[0]} ×${top[1]}`;
+plaza.insertAdjacentHTML('beforeend', '<a class="pcard-add" href="#join"><span class="plus">+</span><b style="color:var(--paper)">提交你的项目卡</b><span class="mono">审核后公开 · 约 3 分钟</span></a>');
+$$('.seg button').forEach(b => b.addEventListener('click', () => {
+  if (b.classList.contains('on')) return;
+  $$('.seg button').forEach(x => x.classList.toggle('on', x === b));
+  const state = window.Flip && !reduce ? Flip.getState('#plaza .pcard, #plaza .cover') : null;
+  plaza.classList.toggle('as-list', b.dataset.layout === 'list');
+  if (state) Flip.from(state, { duration: .7, ease: 'expo.inOut', nested: true, stagger: .02 });
+  try { localStorage.setItem('bs-layout', b.dataset.layout); } catch (e) {}
+}));
+try { if (localStorage.getItem('bs-layout') === 'list') $('.seg [data-layout="list"]').click(); } catch (e) {}
+
+/* ---------- detail: timeline fills as you scroll, copy link ---------- */
+let tlTrig = null;
+const setupDetail = () => {
+  if (tlTrig) { tlTrig.kill(); tlTrig = null; }
+  if (location.hash !== '#project' || !window.ScrollTrigger) return;
+  const fill = $('#tl .tl-fill');
+  if (reduce) { fill.style.transform = 'scaleY(1)'; return; }
+  tlTrig = ScrollTrigger.create({ trigger: '#tl', start: 'top 70%', end: 'bottom 60%', scrub: .5, onUpdate: s => { fill.style.transform = `scaleY(${s.progress})`; } });
+};
+addEventListener('hashchange', () => setTimeout(setupDetail, 60));
+setupDetail();
+const copyBtn = $('#copyProj');
+copyBtn && copyBtn.addEventListener('click', () => {
+  const url = 'https://builderspace.example/projects/coursemate';
+  const done = t => { copyBtn.textContent = t; setTimeout(() => copyBtn.textContent = '复制项目链接', 1600); };
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => done('已复制'), () => done(url));
+  else done(url);
+});
+
+/* ---------- learn: monochrome syntax highlight ---------- */
+if (window.hljs) $$('code[class*="language-"]').forEach(el => hljs.highlightElement(el));
+
+/* ---------- join: live member card ---------- */
+const card = $('#mcard'), stage = $('#mcStage');
+const val = id => ($('#' + id) || {}).value || '';
+const chosen = id => $$(`#${id} .chip.on`).map(b => b.textContent.trim());
+const hash = s => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+const paint = () => {
+  const name = val('f-name').trim() || '你的昵称';
+  $('#mcName').textContent = name;
+  $('#mcMajor').textContent = [val('f-major'), val('f-degree')].filter(Boolean).join(' · ') || '专业 · 学位';
+  $('#mcSkills').innerHTML = chosen('fSkills').map(s => `<span class="tag">${s}</span>`).join('');
+  $('#mcTime').textContent = chosen('fTime')[0] || '—';
+  $('#mcNo').textContent = 'BS-T3-' + String(hash(name) % 9000 + 1000);
+  $('#summary').innerHTML = `<div>昵称 <b>${name}</b> · ${val('f-degree')}</div><div>专业 <b>${val('f-major')}</b></div><div>技能 <b>${chosen('fSkills').join(' / ') || '—'}</b> · 每周 <b>${chosen('fTime')[0] || '—'}</b></div><div>想做 <b>${val('f-idea').slice(0, 40)}${val('f-idea').length > 40 ? '…' : ''}</b></div>`;
+};
+['f-name', 'f-degree', 'f-major', 'f-idea'].forEach(id => { const el = $('#' + id); el && el.addEventListener('input', paint); });
+$$('[data-single]').forEach(g => $$('.chip', g).forEach(b => b.addEventListener('click', () => { $$('.chip', g).forEach(x => x.classList.toggle('on', x === b)); paint(); })));
+$$('#fSkills .chip').forEach(b => b.addEventListener('click', () => setTimeout(paint)));
+paint();
+
+if (fine && !reduce) {
+  stage.addEventListener('pointermove', e => {
+    const r = stage.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    card.style.transition = 'transform .15s linear';
+    card.style.setProperty('--ry', ((x - .5) * 16).toFixed(2) + 'deg');
+    card.style.setProperty('--rx', ((.5 - y) * 12).toFixed(2) + 'deg');
+    card.style.setProperty('--gx', (x * 100).toFixed(1) + '%');
+    card.style.setProperty('--gy', (y * 100).toFixed(1) + '%');
+  });
+  stage.addEventListener('pointerleave', () => { card.style.transition = ''; card.style.setProperty('--rx', '0deg'); card.style.setProperty('--ry', '0deg'); });
+}
+
+/* ---------- join: three steps ---------- */
+const NAMES = ['关于你', '想做什么', '最后一步'];
+let step = 1;
+const go = n => {
+  const prev = step; step = Math.max(1, Math.min(3, n));
+  $$('.fstep').forEach(f => {
+    const k = +f.dataset.step;
+    f.classList.toggle('on', k === step);
+    f.classList.toggle('left', k < step);
+  });
+  $('#stepNo').textContent = '0' + step; $('#stepName').textContent = NAMES[step - 1];
+  $('#s2').classList.toggle('on', step >= 2); $('#s3').classList.toggle('on', step >= 3);
+  $('#prevStep').hidden = step === 1; $('#nextStep').hidden = step === 3; $('#submitBtn').hidden = step !== 3;
+  if (step !== prev) { const f = $(`.fstep[data-step="${step}"] .inp, .fstep[data-step="${step}"] .chip`); f && setTimeout(() => f.focus({ preventScroll: true }), 300); }
+  paint();
+};
+$('#nextStep').addEventListener('click', () => {
+  if (step === 1 && !val('f-name').trim()) { const i = $('#f-name'); i.focus(); i.style.borderColor = 'var(--paper)'; i.placeholder = '先填一个昵称'; return; }
+  go(step + 1);
+});
+$('#prevStep').addEventListener('click', () => go(step - 1));
+// 前两步按回车只前进一步，不提交
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'joinForm') return;
+  if (step < 3) { e.preventDefault(); e.stopImmediatePropagation(); $('#nextStep').click(); return; }
+  $('#doneName').textContent = val('f-name').trim() || '新朋友';
+  setTimeout(() => { drawRealQR(); card.classList.add('flip'); }, 500);
+}, true);
+$('#again').addEventListener('click', () => { card.classList.remove('flip'); go(1); });
+
+/* ---------- real, scannable QR (demo payload) with rounded modules ---------- */
+function drawRealQR() {
+  const cv = $('#qr'); if (!cv || !window.qrcode) return;
+  const q = qrcode(0, 'M'); q.addData('https://builderspace.example/join?demo=1'); q.make();
+  const n = q.getModuleCount(), S = 10, pad = 2, W = (n + pad * 2) * S;
+  cv.width = cv.height = W; cv.style.imageRendering = 'auto';
+  const g = cv.getContext('2d');
+  g.fillStyle = '#f4f4f2'; g.fillRect(0, 0, W, W); g.fillStyle = '#050505';
+  const finder = (r, c) => r < 7 && c < 7 || r < 7 && c >= n - 7 || r >= n - 7 && c < 7;
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    if (!q.isDark(r, c) || finder(r, c)) continue;
+    g.beginPath(); g.arc((c + pad + .5) * S, (r + pad + .5) * S, S * .42, 0, 7); g.fill();
+  }
+  const eye = (r, c) => {
+    const x = (c + pad) * S, y = (r + pad) * S, rr = (X, Y, w, rad) => { g.beginPath(); g.roundRect ? g.roundRect(X, Y, w, w, rad) : g.rect(X, Y, w, w); g.fill(); };
+    g.fillStyle = '#050505'; rr(x, y, 7 * S, 2.2 * S);
+    g.fillStyle = '#f4f4f2'; rr(x + S, y + S, 5 * S, 1.4 * S);
+    g.fillStyle = '#050505'; rr(x + 2 * S, y + 2 * S, 3 * S, .9 * S);
+  };
+  eye(0, 0); eye(0, n - 7); eye(n - 7, 0);
+}
+})();
+</script>
+
+
+
+
+</body>
+</html>
