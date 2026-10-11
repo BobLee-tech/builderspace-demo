@@ -8,6 +8,12 @@
 <meta name="theme-color" content="#050505">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>BuilderSpace 官网原型</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta property="og:title" content="BuilderSpace · Bring an idea. Leave with something that works.">
+<meta property="og:description" content="从 UNSW 起步的中英双语创客社团。带着想法来，两小时做出第一个能用的页面。">
+<meta property="og:image" content="assets/og.jpg">
+<link rel="preload" as="image" href="assets/mark-240.webp" type="image/webp">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;600;800&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap">
@@ -16,6 +22,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<!-- v5：吉祥物粒子数据（由 logo 原图采样生成，见 assets/） -->
+<script src="assets/mascot-particles.js"></script>
 <!-- v4：筛选布局动画 / 代码高亮 / 真实二维码 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/Flip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -899,10 +907,321 @@ body{text-rendering:optimizeLegibility}
 }
 </style>
 
+<style>
+/* =====================================================================
+   v7 · 精密材质包 PRECISION PACK
+   UI 回到黑 / 白 / 铬；整页唯一的颜色留给吉祥物本身（像产品图放在单色页面上）。
+   科技感来自材质与光，而不是金色：微点阵、磨砂玻璃、铬字、指针边缘光、点阵粒子。
+   ===================================================================== */
+:root{
+  --mat-micro:radial-gradient(circle,rgba(255,255,255,.06) 0 .55px,transparent .9px);       /* 5px 微点阵 · 面板底纹 */
+  --mat-frost:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.012) 38%,rgba(255,255,255,.022));
+  --mat-porcelain:radial-gradient(130% 120% at 28% 0%,#ffffff 0%,#f2f2ef 42%,#d6d6d2 100%);  /* 白瓷 · 浅色拼图 */
+  --mat-obsidian:radial-gradient(120% 110% at 26% 8%,#2b2b2e 0%,#121213 42%,#060606 80%);   /* 黑曜石 · 深色拼图 */
+  --mat-holo:linear-gradient(115deg,transparent 32%,rgba(190,215,255,.09) 43%,rgba(255,225,190,.08) 52%,transparent 63%);  /* 薄膜干涉 · 只用在成员卡 */
+  --spring:cubic-bezier(.34,1.56,.64,1);
+}
+html{scrollbar-color:#2a2a2d transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#262628;border-radius:10px;border:3px solid var(--ink)}
+::-webkit-scrollbar-thumb:hover{background:#4a4a4e}
+
+/* ---------- brand mark ---------- */
+.logo-mark{display:block;width:34px;height:auto;grid-template-columns:none;transform-origin:50% 80%}
+.logo:hover .logo-mark{animation:jelly .7s var(--ease)}
+@keyframes jelly{0%{transform:scale(1)}28%{transform:scale(1.14,.86)}48%{transform:scale(.9,1.1)}68%{transform:scale(1.05,.96)}84%{transform:scale(.98,1.02)}100%{transform:scale(1)}}
+.foot a.logo{display:flex}
+
+/* ---------- surfaces: frosted glass on a micro dot-matrix ---------- */
+.next,.box,.lcard,.form{background-image:var(--mat-frost),var(--mat-micro);background-size:auto,5px 5px;background-color:var(--panel)}
+.next::after,.pcard::after,.box::after,.lcard::after,.form::after,.metrics::after,.pillars::after{
+  background:radial-gradient(260px circle at var(--mx,-999px) var(--my,-999px),rgba(255,255,255,.7),transparent 60%),var(--edge)}
+/* cursor-revealed grid: the blueprint lights up where you look */
+.gridspot{position:fixed;left:0;top:0;width:520px;height:520px;pointer-events:none;z-index:0;opacity:0;transition:opacity .5s;will-change:transform;
+  background-image:linear-gradient(rgba(255,255,255,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.14) 1px,transparent 1px);background-size:120px 120px;
+  -webkit-mask-image:radial-gradient(circle,#000,transparent 68%);mask-image:radial-gradient(circle,#000,transparent 68%)}
+.gridspot.on{opacity:1}
+
+/* ---------- mascot stage: full-bleed particle render with a HUD frame ---------- */
+.stage{position:relative;min-height:min(980px,108svh);overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  background:radial-gradient(60% 50% at 50% 44%,rgba(255,255,255,.035),transparent 70%)}
+.stage::after{content:"";position:absolute;inset:0;pointer-events:none;background:var(--mat-scan);opacity:.6;z-index:1}
+#mascot{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:0}
+.stage-mark{position:absolute;left:50%;top:44%;width:min(52vw,820px);height:auto;translate:-50% -50%;pointer-events:none}
+.stage.pm-on .stage-mark{display:none}
+.stage-frame{position:absolute;z-index:2;pointer-events:none;opacity:.35;transition:opacity .8s var(--ease)}
+.stage.formed .stage-frame{opacity:1}
+.stage-frame>.c{position:absolute;width:14px;height:14px;border-color:var(--paper);border-style:solid;opacity:.8}
+.stage-frame>.c.tl{top:0;left:0;border-width:1px 0 0 1px}.stage-frame>.c.tr{top:0;right:0;border-width:1px 1px 0 0}
+.stage-frame>.c.bl{bottom:0;left:0;border-width:0 0 1px 1px}.stage-frame>.c.br{bottom:0;right:0;border-width:0 1px 1px 0}
+.sf-l,.sf-r{position:absolute;font-size:10px;color:var(--mute);white-space:nowrap;font-variant-numeric:tabular-nums}
+.sf-l{left:0;top:-20px}.sf-r{right:0;bottom:-20px;color:var(--paper)}
+.sf-x,.sf-y{position:absolute;background:var(--line-2)}
+.sf-x{left:-40px;right:-40px;top:50%;height:1px;-webkit-mask:linear-gradient(90deg,#000 0 30px,transparent 30px calc(100% - 30px),#000 0);mask:linear-gradient(90deg,#000 0 30px,transparent 30px calc(100% - 30px),#000 0)}
+.sf-y{top:-40px;bottom:-40px;left:50%;width:1px;-webkit-mask:linear-gradient(#000 0 30px,transparent 30px calc(100% - 30px),#000 0);mask:linear-gradient(#000 0 30px,transparent 30px calc(100% - 30px),#000 0)}
+.stage-in{position:relative;z-index:3;min-height:inherit;display:flex;flex-direction:column;justify-content:space-between;padding-block:clamp(40px,6vw,72px);pointer-events:none}
+.stage-in a,.stage-in button{pointer-events:auto}
+.stage-top{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.stage-top b{color:var(--paper);font-weight:500}
+.stage-bot{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px 40px;align-items:end}
+.stage-title{font-size:clamp(40px,7.4vw,112px)}
+.stage-ctl{display:flex;flex-direction:column;align-items:flex-end;gap:14px;text-align:right}
+.stage-cap{max-width:30ch;font-size:13.5px}
+.smode{margin-top:0}
+.stage.pm-on .stage-title .line>span{animation:none;transform:translateY(105%);transition:transform 1.1s var(--ease)}
+.stage.pm-on .stage-title .line:nth-child(2)>span{transition-delay:.08s}
+.stage.seen .stage-title .line>span{transform:none}
+@keyframes float{50%{transform:translateY(-12px)}}
+
+/* ---------- boot ---------- */
+.boot-mark{align-self:center;width:clamp(110px,16vw,180px);height:auto;animation:bootIn .9s var(--spring) both,float 2.4s ease-in-out .9s infinite}
+@keyframes bootIn{from{opacity:0;transform:scale(.6) translateY(30px)}to{opacity:1;transform:none}}
+
+/* ---------- member card: obsidian + thin-film holo + mascot watermark ---------- */
+.mc-front{background:url(assets/mark-240.webp) right -46px top 40%/178px auto no-repeat,var(--mat-obsidian)}
+.mc-holo{background:radial-gradient(40% 60% at var(--gx) var(--gy),rgba(255,255,255,.2),transparent 70%),var(--mat-holo);background-size:auto,220% 100%;background-position:0 0,calc(100% - var(--gx)) 0}
+
+/* ---------- two pieces: porcelain × obsidian, the logo in monochrome ---------- */
+.pieces{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));position:relative;margin-top:8px}
+.piece{position:relative;min-height:400px;padding:clamp(24px,3.4vw,44px);border-radius:30px;display:flex;flex-direction:column;gap:14px;isolation:isolate;will-change:transform}
+.piece.light{z-index:2;color:var(--ink);background-image:radial-gradient(circle,rgba(0,0,0,.07) 0 .55px,transparent .9px),var(--mat-porcelain);background-size:5px 5px,auto;
+  box-shadow:inset 0 1px 0 #fff,inset 0 -24px 48px rgba(0,0,0,.08),0 40px 80px -48px rgba(255,255,255,.18)}
+.piece.light::after{content:"";position:absolute;right:-35px;top:50%;width:72px;height:72px;margin-top:-36px;border-radius:50%;
+  background:radial-gradient(circle at 34% 28%,#ffffff,#e9e9e6 55%,#cfcfcb);box-shadow:inset 0 -6px 12px rgba(0,0,0,.08)}
+.piece.dark{padding-left:calc(clamp(24px,3.4vw,44px) + 34px);color:var(--paper);background-image:var(--mat-micro),var(--mat-obsidian);background-size:5px 5px,auto;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.2),inset 0 1px 0 rgba(255,255,255,.18);
+  -webkit-mask:radial-gradient(circle at 0 50%,transparent 38px,#000 38.5px);mask:radial-gradient(circle at 0 50%,transparent 38px,#000 38.5px)}
+.piece.dark::after{content:"";position:absolute;left:-40px;top:50%;width:80px;height:80px;margin-top:-40px;border-radius:50%;box-shadow:0 0 0 1px rgba(255,255,255,.28);pointer-events:none}
+.piece::before{content:"";position:absolute;left:10%;right:36%;top:10px;height:24%;border-radius:999px 999px 60% 60%;pointer-events:none;z-index:-1;background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,0))}
+.piece.light::before{background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,0))}
+.piece-face{position:absolute;top:clamp(26px,3.4vw,46px);right:clamp(26px,3.4vw,46px);display:flex;gap:11px}
+.piece-face i{width:12px;height:30px;border-radius:999px;background:#0b0b0c;transform:translate(var(--lx,0px),var(--ly,0px));transition:transform .35s var(--ease);animation:eyeblink 5.2s infinite}
+.piece.dark .piece-face i{background:var(--paper);box-shadow:0 0 12px rgba(255,255,255,.45);animation-delay:1.3s}
+@keyframes eyeblink{0%,93%,100%{scale:1 1}96%{scale:1 .08}}
+.piece-k{color:#6a6a70}
+.piece.dark .piece-k{color:var(--mute)}
+.piece h3{margin-top:auto;font-family:var(--f-display);font-weight:800;font-size:clamp(28px,3.4vw,44px);letter-spacing:-.045em;line-height:1.02}
+.piece p{max-width:34ch;font-size:15px;color:#4a4a50}
+.piece.dark p{color:var(--mute)}
+.piece-list{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.piece-list li{font-family:var(--f-mono);font-size:11px;letter-spacing:.04em;padding:4px 10px;border-radius:999px;border:1px solid rgba(0,0,0,.18);color:#3a3a3f}
+.piece.dark .piece-list li{border-color:var(--line-2);color:var(--mute)}
+.piece-cta{display:inline-flex;gap:8px;align-items:center;align-self:flex-start;margin-top:10px;font-weight:600;padding-bottom:3px;background:linear-gradient(currentColor,currentColor) 0 100%/100% 1px no-repeat;transition:background-size .45s var(--ease)}
+.piece-cta:hover{background-size:0 1px;background-position:100% 100%}
+.piece-cta .arr{transition:transform .35s var(--ease)}
+.piece-cta:hover .arr{transform:translateX(4px)}
+.pieces::after{content:"";position:absolute;left:50%;top:50%;width:160px;height:160px;margin:-80px 0 0 -80px;border-radius:50%;pointer-events:none;z-index:3;
+  background:radial-gradient(circle,rgba(255,255,255,.5),transparent 65%);opacity:0;transform:scale(.4)}
+.pieces.snapped::after{animation:snap .9s var(--ease)}
+@keyframes snap{0%{opacity:0;transform:scale(.4)}25%{opacity:1}100%{opacity:0;transform:scale(1.6)}}
+
+/* ---------- v8 · footer: next page / mascot stage / variable wordmark / bar ---------- */
+/* 可变字重版 Unbounded 只给页尾字标用；其余描边字保持静态字重（可变字体的重叠轮廓会被描边暴露） */
+@font-face{font-family:"Unbounded VF";font-style:normal;font-weight:200 900;font-display:swap;
+  src:url(https://fonts.gstatic.com/s/unbounded/v12/Yq6W-LOTXCb04q32xlpwu8ZfvRIkSQ.woff2) format("woff2");unicode-range:U+0000-00FF}
+footer.foot2{padding:0;border-top:0}
+.foot-next{display:block;position:relative;overflow:hidden;isolation:isolate;border-top:1px solid var(--line);color:var(--paper);--from:100%}
+.foot-next::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--mat-brushed),var(--paper);transform:scaleY(0);transform-origin:50% var(--from);transition:transform .75s var(--ease)}
+.foot-next:hover::before{transform:scaleY(1)}
+.foot-next:hover{color:var(--ink)}
+.foot-next:hover .mute,.foot-next:hover .fn-sub{color:#55555a}
+.fn-in{display:flex;flex-direction:column;gap:12px;padding-block:clamp(36px,6vw,76px)}
+.fn-meta{display:flex;justify-content:space-between;gap:16px}
+.fn-row{display:flex;align-items:center;justify-content:space-between;gap:24px}
+.fn-title{display:block;height:1.08em;overflow:hidden;font-family:var(--f-display);font-weight:800;font-size:clamp(44px,9.4vw,140px);letter-spacing:-.05em;line-height:1.08}
+.fn-roll{display:flex;flex-direction:column;transition:transform .75s var(--ease)}
+.fn-roll>span{display:block;height:1.08em;white-space:nowrap}
+.fn-roll>span:first-child{color:transparent;-webkit-text-stroke:1.2px rgba(244,244,242,.75)}
+.foot-next:hover .fn-roll{transform:translateY(-1.08em)}
+.fn-go{flex:none;width:clamp(56px,7vw,104px);aspect-ratio:1;border-radius:50%;border:1px solid var(--line-2);display:grid;place-items:center;font-size:clamp(22px,2.8vw,40px);
+  transition:transform .75s var(--ease),background .4s,color .4s,border-color .4s}
+.foot-next:hover .fn-go{transform:rotate(-45deg);background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.fn-sub{color:var(--mute);font-size:15px;transition:color .4s}
+
+footer .stage{min-height:min(920px,98svh)}
+#mascot{z-index:1}
+.wordmark{position:absolute;left:0;right:0;bottom:clamp(18px,3vw,44px);z-index:0;display:flex;justify-content:center;pointer-events:none;user-select:none;
+  font-family:"Unbounded VF",var(--f-display);font-size:10.4vw;line-height:.82;letter-spacing:-.045em;white-space:nowrap}
+.wordmark span{--k:0;font-weight:calc(220 + var(--k) * 680);color:rgba(244,244,242,calc(.075 + var(--k) * .88));text-shadow:0 0 calc(var(--k) * 46px) rgba(255,255,255,calc(var(--k) * .22))}
+.stage-top{align-items:flex-start}
+.stage-cap-wrap{display:flex;flex-direction:column;gap:12px}
+.stage-cap{max-width:32ch}
+
+.foot{padding-top:clamp(40px,5vw,64px)}
+.foot>div:not(:first-child) a{display:flex;align-items:center;gap:6px;width:max-content;background:linear-gradient(currentColor,currentColor) 0 100%/0 1px no-repeat;transition:background-size .45s var(--ease),color .3s}
+.foot>div:not(:first-child) a::after{content:"→";opacity:0;transform:translateX(-6px);transition:opacity .3s,transform .45s var(--ease)}
+.foot>div:not(:first-child) a:hover{background-size:100% 1px}
+.foot>div:not(:first-child) a:hover::after{opacity:1;transform:none}
+.foot-ascii2{margin-top:22px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.foot-ascii2 .ascii{font-size:5.5px;text-align:left;opacity:.7}
+.foot-bar{display:flex;align-items:center;justify-content:space-between;gap:12px 24px;flex-wrap:wrap;margin-top:44px;padding:18px 0 32px;border-top:1px solid var(--line);color:var(--mute)}
+.foot-bar b{color:var(--paper);font-weight:500;font-variant-numeric:tabular-nums}
+.fb-status{display:inline-flex;align-items:center;gap:8px}
+.fb-status i{width:6px;height:6px;border-radius:50%;background:var(--paper);animation:ping 1.8s infinite}
+.totop{position:relative;flex:none;width:44px;height:44px;border:0;padding:0;background:none;border-radius:50%;cursor:pointer;display:grid;place-items:center;color:var(--paper);font-size:15px}
+.totop svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.tt-bg{fill:none;stroke:var(--line-2);stroke-width:1;transition:stroke .3s}
+.tt-fg{fill:none;stroke:var(--paper);stroke-width:1.5;stroke-linecap:round}
+.totop>span{transition:transform .45s var(--ease)}
+.totop:hover>span{transform:translateY(-3px)}
+.totop:hover .tt-bg{stroke:var(--mute)}
+@media (max-width:720px){
+  .fn-sub{font-size:13.5px}
+  footer .stage{min-height:86svh}
+  .stage-top{flex-direction:column;gap:18px}
+  .stage-ctl>span{display:none}
+  .foot-bar{flex-direction:column;align-items:flex-start;padding-bottom:120px}
+  .fb-clock{order:-1}
+  .totop{position:absolute;right:0;top:12px}
+  .foot-bar{position:relative}
+}
+
+/* spec: material swatches row */
+.spec-grid.mat-row{margin-top:16px}
+@keyframes holo{from{background-position:0 0,0 0}to{background-position:100% 0,0 0}}
+
+@media (max-width:720px){
+  .gridspot{display:none!important}
+  .stage{min-height:88svh}
+  .stage-mark{top:36%;width:86vw}
+  .stage-bot{grid-template-columns:1fr}
+  .stage-ctl{align-items:flex-start;text-align:left}
+  .stage-top>span{display:none}
+  .pieces{grid-template-columns:1fr}
+  .piece{min-height:330px}
+  .piece.light::after{right:auto;top:auto;left:50%;bottom:-35px;margin:0 0 0 -36px}
+  .piece.dark{padding-left:clamp(24px,3.4vw,44px);padding-top:calc(clamp(24px,3.4vw,44px) + 30px);
+    -webkit-mask:radial-gradient(circle at 50% 0,transparent 38px,#000 38.5px);mask:radial-gradient(circle at 50% 0,transparent 38px,#000 38.5px)}
+  .piece.dark::after{left:50%;top:-40px;margin:0 0 0 -40px}
+  .piece.dark .piece-face{top:calc(clamp(26px,3.4vw,46px) + 30px)}
+}
+@media (prefers-reduced-motion:reduce){.piece-face i,.boot-mark{animation:none}.gridspot{display:none}}
+</style>
+
+
+
+<style>
+/* =====================================================================
+   v9 · 导航与按钮质感：瓷白（主操作 / 选中）× 磨砂玻璃（次要 / 容器）
+   只用黑白灰：靠渐变、高光、内阴影和发丝边做出材质，不引入新颜色。
+   ===================================================================== */
+:root{
+  --mat-button:linear-gradient(180deg,#ffffff 0%,#f1f1ee 46%,#dadad6 100%);
+  --sh-button:inset 0 1px 0 #fff,inset 0 -1px 0 rgba(0,0,0,.16),0 0 0 1px rgba(255,255,255,.28),0 10px 26px -12px rgba(255,255,255,.5);
+  --sh-button-hi:inset 0 1px 0 #fff,inset 0 -1px 0 rgba(0,0,0,.16),0 0 0 1px rgba(255,255,255,.5),0 14px 36px -10px rgba(255,255,255,.65);
+  --glass:rgba(255,255,255,.035);
+  --sh-glass:inset 0 0 0 1px rgba(255,255,255,.11),inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+/* ---------- header: clear at the top, frosted glass once you scroll ---------- */
+.top{background:linear-gradient(180deg,rgba(5,5,5,.82),rgba(5,5,5,.35));border-bottom-color:transparent;transition:translate .5s var(--ease),background .4s}
+.top::before{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.13) 18%,rgba(255,255,255,.13) 82%,transparent);opacity:.6;transition:opacity .4s}
+.top.scrolled{background:rgba(9,9,10,.6);backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5)}
+.top.scrolled::before{opacity:1}
+.top .wrap{height:64px}
+.logo{letter-spacing:-.015em}
+.nav{padding:4px;gap:2px;border:0;border-radius:999px;background:var(--glass);box-shadow:var(--sh-glass),0 10px 30px -16px rgba(0,0,0,.9)}
+.nav a{padding:8px 15px;font-size:13px;font-weight:500;letter-spacing:.005em;color:#9a9aa0}
+.nav a:hover{color:var(--paper)}
+.nav-pill{background:var(--mat-button);box-shadow:var(--sh-button)}
+.nav a.on{color:var(--ink)}
+.lang{padding:3px;gap:2px;border:0;background:var(--glass);box-shadow:var(--sh-glass)}
+.lang button{border-radius:999px;padding:5px 11px;transition:color .3s,background .3s}
+.lang button:hover{color:var(--paper)}
+.lang button.on{background:var(--mat-button);color:var(--ink);box-shadow:inset 0 1px 0 #fff,0 2px 8px -2px rgba(255,255,255,.35)}
+
+/* ---------- primary: porcelain ---------- */
+.btn{font-weight:600;letter-spacing:-.005em;transition:color .35s var(--ease),box-shadow .45s var(--ease),filter .25s}
+.btn.solid{border-color:transparent;color:var(--ink);box-shadow:var(--sh-button)}
+.btn.solid::before,.btn.solid:hover::before{transform:none;background:var(--mat-button)}
+.btn.solid:hover{color:var(--ink);box-shadow:var(--sh-button-hi)}
+.btn.solid::after{mix-blend-mode:normal;background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.95) 50%,transparent 62%);opacity:.7}
+.btn:active{filter:brightness(.94)}
+/* ---------- secondary: glass, porcelain rises on hover ---------- */
+.btn.ghost{border-color:transparent;background:var(--glass);box-shadow:var(--sh-glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.btn.ghost::before{background:var(--mat-button)}
+.btn.ghost:hover{color:var(--ink);box-shadow:var(--sh-button)}
+
+/* arrow lives in a round chip and loops on hover */
+.btn:has(.arr){padding-right:6px}
+.btn .arr{display:inline-grid;place-items:center;width:calc(var(--h) - 12px);height:calc(var(--h) - 12px);margin-left:4px;border-radius:50%;overflow:hidden;font-weight:400;
+  background:var(--ink);color:var(--paper);transform:none!important;transition:background .35s,color .35s}
+.btn .arr b{grid-area:1/1;font-weight:400;transition:transform .55s var(--ease)}
+.btn .arr b+b{transform:translateX(-160%)}
+.btn .arr.diag b+b{transform:translate(-160%,160%)}
+.btn:hover .arr b:first-child{transform:translateX(160%)}
+.btn:hover .arr.diag b:first-child{transform:translate(160%,-160%)}
+.btn:hover .arr b+b{transform:none}
+.btn.ghost .arr{background:rgba(255,255,255,.08)}
+.btn.ghost:hover .arr{background:var(--ink);color:var(--paper)}
+
+/* ---------- chips / segmented controls ---------- */
+.chip{background:rgba(255,255,255,.025);border-color:rgba(255,255,255,.12);transition:color .25s,border-color .25s,background .25s,box-shadow .25s}
+.chip:hover{border-color:rgba(255,255,255,.38);background:rgba(255,255,255,.05);color:var(--paper)}
+.chip.on,.seg button.on,.rmode button.on{background:var(--mat-button);color:var(--ink);border-color:transparent;box-shadow:inset 0 1px 0 #fff,inset 0 -1px 0 rgba(0,0,0,.14),0 4px 14px -6px rgba(255,255,255,.45)}
+.seg,.rmode{border-color:transparent;background:var(--glass);box-shadow:var(--sh-glass);padding:2px;gap:2px;border-radius:999px}
+.seg button,.rmode button{border-radius:999px;background:none}
+.tag.fill{background:var(--mat-button);box-shadow:inset 0 1px 0 #fff}
+
+.nav a,.btn,.lang button{white-space:nowrap}
+@media (max-width:1080px){.top .wrap{gap:14px}.nav a{padding:7px 10px;font-size:12.5px}}
+@media (min-width:721px) and (max-width:860px){.top .logo{font-size:0;gap:0}.top .logo .logo-mark{width:38px}}
+@media (max-width:720px){
+  .top .wrap{height:58px}
+  .dock{background:rgba(14,14,15,.72);backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5);border:0;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),inset 0 1px 0 rgba(255,255,255,.1),0 20px 40px -16px #000;border-radius:22px}
+  .dock a{transition:color .3s,background .3s}
+  .dock a.on{background:var(--mat-button);color:var(--ink);box-shadow:inset 0 1px 0 #fff,0 6px 18px -8px rgba(255,255,255,.5)}
+  .btn:has(.arr){padding-right:5px}
+}
+</style>
+
+<style>
+/* =====================================================================
+   v10 · 页首：终端路径条 / 铬字逐字翻起 / 描边字被指针照亮 / 读数解码
+   ===================================================================== */
+.ph-bar{grid-column:1/-1;display:flex;align-items:center;gap:16px;margin-bottom:clamp(24px,3.4vw,44px);color:var(--mute);font-size:11px}
+.ph-solo{display:block;margin-bottom:0}
+.ph-path{white-space:nowrap;text-transform:none;letter-spacing:.02em}
+.ph-path b{color:var(--paper);font-weight:500}
+.ph-path::after{content:"";display:inline-block;width:.6em;height:1.15em;margin-left:3px;vertical-align:-.25em;background:var(--paper);animation:blink 1s steps(1) infinite}
+.ph-rule{flex:1;position:relative;height:9px;min-width:40px}
+.ph-rule::before{content:"";position:absolute;left:0;right:0;top:0;height:5px;opacity:.7;
+  background:repeating-linear-gradient(90deg,var(--line-2) 0 1px,transparent 1px 24px);-webkit-mask:linear-gradient(90deg,#000,transparent);mask:linear-gradient(90deg,#000,transparent)}
+.ph-rule i{position:absolute;left:0;right:0;top:4px;height:1px;background:linear-gradient(90deg,var(--paper),var(--line-2) 40%,transparent);transform-origin:left}
+.view.on .ph-rule i{animation:drawX 1.3s var(--ease) .15s both}
+@keyframes drawX{from{transform:scaleX(0)}}
+.ph-idx{white-space:nowrap;font-variant-numeric:tabular-nums}
+.ph-idx b{color:var(--paper);font-weight:500}
+
+/* line 1: chrome, entered letter by letter (GSAP); line 2: outline lit by a moving light */
+.page-title{perspective:800px}
+.page-title .line{transition:transform .9s var(--ease)}
+.page-title .line:first-child{transform:translate3d(calc(var(--px,0) * 7px),calc(var(--py,0) * 3px),0)}
+.page-title .line:nth-child(2){transform:translate3d(calc(var(--px,0) * 16px),calc(var(--py,0) * 6px),0)}
+.ttl-a{background:var(--mat-chrome);background-size:100% 220%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:chromeShift 2.6s cubic-bezier(.2,.7,.1,1) .3s both}
+.js-split .ttl-a{background:none;animation:none;color:inherit}
+.ttl-a .c2{display:inline-block;white-space:pre;background:var(--mat-chrome);background-size:100% 220%;background-position:0 100%;-webkit-background-clip:text;background-clip:text;color:transparent;will-change:transform}
+.page-title .line:first-child>.ttl-a{animation:none}
+.js-split .page-title .line:first-child>.ttl-a{transform:none}
+.outline.lit{background:radial-gradient(220px circle at var(--lx,-999px) var(--ly,-999px),#ffffff 0%,rgba(255,255,255,.55) 30%,rgba(255,255,255,0) 70%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:1.2px rgba(244,244,242,.72)}
+
+/* readouts: hover lights the cell */
+.page-aside>div{position:relative;transition:background .4s}
+.page-aside>div::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--paper),transparent);transform:scaleX(0);transition:transform .6s var(--ease)}
+.page-aside>div:hover{background:rgba(255,255,255,.035)}
+.page-aside>div:hover::before{transform:scaleX(1)}
+.page-aside dd{font-variant-numeric:tabular-nums}
+@media (max-width:720px){.ph-rule{display:none}.ph-bar{justify-content:space-between}}
+@media (prefers-reduced-motion:reduce){.page-title .line{transform:none!important}.ph-path::after{animation:none}}
+</style>
+
 <div class="boot" id="boot" aria-hidden="true">
   <div></div><div></div>
   <div class="boot-in">
     <div class="mono" style="display:flex;justify-content:space-between;gap:16px"><span>BuilderSpace · System boot</span><span>T3 2026 / W01</span></div>
+    <img class="boot-mark" src="assets/mark-240.webp" alt="" width="240" height="154">
     <div>
       <div class="boot-log mono" id="bootLog"></div>
       <div class="boot-num" id="bootNum">000</div>
@@ -914,11 +1233,12 @@ body{text-rendering:optimizeLegibility}
 <div class="marks" aria-hidden="true"></div>
 <div class="backdrop" aria-hidden="true"></div>
 <div class="grain" aria-hidden="true"></div>
+<div class="gridspot" aria-hidden="true"></div>
 
 <header class="top">
   <div class="wrap">
     <a href="#home" class="logo" aria-label="BuilderSpace 首页">
-      <span class="logo-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      <img class="logo-mark" src="assets/mark-240.webp" alt="" width="36" height="23" decoding="async">
       BuilderSpace
     </a>
     <nav class="nav" aria-label="主导航">
@@ -933,7 +1253,7 @@ body{text-rendering:optimizeLegibility}
       <button class="on" data-lang="zh" type="button">中</button>
       <button data-lang="en" type="button">EN</button>
     </div>
-    <a href="#join" class="btn solid" style="--h:38px;padding:0 16px;font-size:13px">加入 <span class="arr">→</span></a>
+    <a href="#join" class="btn solid" style="--h:38px;padding:0 5px 0 16px;font-size:13px"><span data-en="Join">加入</span> <span class="arr">→</span></a>
   </div>
   <div class="progress" aria-hidden="true"><i id="prog"></i></div>
 </header>
@@ -958,10 +1278,10 @@ body{text-rendering:optimizeLegibility}
     <div class="scrollcue mono" aria-hidden="true"><i></i>Scroll</div>
     <div class="wrap">
       <div class="hero-meta mono mute stagger">
-        <span class="live" style="color:var(--paper)">Cycle 01 组队报名中</span>
+        <span class="live" style="color:var(--paper)" data-en="Cycle 01 · teams forming">Cycle 01 组队报名中</span>
         <span>Sydney · Kensington</span>
         <span>T3 2026 / Week <b id="wkno" style="color:var(--paper)">01</b></span>
-        <span>中英双语创客社团</span>
+        <span data-en="Bilingual maker club">中英双语创客社团</span>
       </div>
       <h1 class="display" aria-label="Bring an idea. Leave with something that works.">
         <span class="line"><span data-scramble>Bring an idea.</span></span>
@@ -971,8 +1291,8 @@ body{text-rendering:optimizeLegibility}
       <div class="hero-sub stagger">
         <p class="hero-zh">带着想法来，<b>两小时</b>做出第一个能用的页面。<br><span class="mute" style="font-size:.72em;font-weight:400">一个从 UNSW 起步的中英双语创客社团：学 Vibe Coding、找队友、每周一起把项目做出来。</span></p>
         <div class="hero-cta">
-          <a href="#join" class="btn solid">加入 BuilderSpace <span class="arr">→</span></a>
-          <a href="#projects" class="btn ghost">看项目广场</a>
+          <a href="#join" class="btn solid"><span data-en="Join BuilderSpace">加入 BuilderSpace</span> <span class="arr">→</span></a>
+          <a href="#projects" class="btn ghost"><span data-en="Browse projects">看项目广场</span></a>
         </div>
       </div>
     </div>
@@ -989,43 +1309,43 @@ body{text-rendering:optimizeLegibility}
   <section class="sec" style="border-top:0">
     <div class="wrap">
       <div class="sec-head">
-        <div><div class="eyebrow mono">下一场活动 / Next up</div>
-        <h2 class="h2">首场工作坊<span class="dim">，就在停课周。</span></h2></div>
-        <a href="#events" class="btn ghost" style="--h:40px">全部活动 <span class="arr">→</span></a>
+        <div><div class="eyebrow mono" data-en="Next up">下一场活动 / Next up</div>
+        <h2 class="h2" data-en="First workshop<span class=&quot;dim&quot;>, in flexibility week.</span>">首场工作坊<span class="dim">，就在停课周。</span></h2></div>
+        <a href="#events" class="btn ghost" style="--h:40px"><span data-en="All events">全部活动</span> <span class="arr">→</span></a>
       </div>
       <div class="next">
         <i class="notch t" aria-hidden="true"></i><i class="notch b" aria-hidden="true"></i>
         <div class="next-l">
-          <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="tag fill">Workshop</span><span class="tag">零基础友好</span><span class="tag dash">讲解：中文 · 产出：英文 README</span></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="tag fill">Workshop</span><span class="tag" data-en="Beginner friendly">零基础友好</span><span class="tag dash" data-en="Taught in Chinese · README in English">讲解：中文 · 产出：英文 README</span></div>
           <div>
-            <h3 style="font-family:var(--f-display);font-size:clamp(24px,3.2vw,38px);font-weight:600;letter-spacing:-.03em;line-height:1.1">Vibe Coding 101<br>两小时做出你的第一个页面</h3>
-            <p class="mute" style="margin-top:12px;max-width:52ch">用 AI 写，自己看得懂、调得通。从拆需求开始，到部署上线结束，带走一个能发给朋友的链接。</p>
+            <h3 style="font-family:var(--f-display);font-size:clamp(24px,3.2vw,38px);font-weight:600;letter-spacing:-.03em;line-height:1.1">Vibe Coding 101<br><span data-en="Ship your first page in two hours">两小时做出你的第一个页面</span></h3>
+            <p class="mute" style="margin-top:12px;max-width:52ch" data-en="Let AI write it — and make sure you can read and debug every line. From breaking down the idea to deploying, you leave with a link to send your friends.">用 AI 写，自己看得懂、调得通。从拆需求开始，到部署上线结束，带走一个能发给朋友的链接。</p>
           </div>
           <div class="kv">
-            <div><span class="mono mute">日期</span><b>10 月 21 日 周三</b></div>
-            <div><span class="mono mute">时间</span><b>18:30 – 20:30</b></div>
-            <div><span class="mono mute">地点</span><b>校内教室 · 报名后通知</b></div>
+            <div><span class="mono mute" data-en="Date">日期</span><b data-en="Wed 21 Oct">10 月 21 日 周三</b></div>
+            <div><span class="mono mute" data-en="Time">时间</span><b>18:30 – 20:30</b></div>
+            <div><span class="mono mute" data-en="Where">地点</span><b data-en="On campus · room sent after RSVP">校内教室 · 报名后通知</b></div>
           </div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-            <a href="#join" class="btn solid">报名（Luma）<span class="arr">↗</span></a>
-            <span class="mono mute">已报名 <b style="color:var(--paper)" data-count="23">0</b> / 40</span>
+            <a href="#join" class="btn solid"><span data-en="RSVP on Luma">报名（Luma）</span> <span class="arr">↗</span></a>
+            <span class="mono mute"><span data-en="RSVP'd">已报名</span> <b style="color:var(--paper)" data-count="23">0</b> / 40</span>
           </div>
         </div>
         <div class="next-r">
           <div>
             <div class="countdown" id="cd">
-              <div><b data-u="d">00</b><span class="mono mute">天</span></div>
-              <div><b data-u="h">00</b><span class="mono mute">时</span></div>
-              <div><b data-u="m">00</b><span class="mono mute">分</span></div>
-              <div><b data-u="s">00</b><span class="mono mute">秒</span></div>
+              <div><b data-u="d">00</b><span class="mono mute" data-en="Days">天</span></div>
+              <div><b data-u="h">00</b><span class="mono mute" data-en="Hrs">时</span></div>
+              <div><b data-u="m">00</b><span class="mono mute" data-en="Min">分</span></div>
+              <div><b data-u="s">00</b><span class="mono mute" data-en="Sec">秒</span></div>
             </div>
             <div class="agenda">
-              <span class="mono mute">流程</span>
+              <span class="mono mute" data-en="Agenda">流程</span>
               <ul>
-                <li><span>18:30</span><span>5 分钟讲清楚 Vibe Coding 能做什么、不能做什么</span></li>
-                <li><span>18:45</span><span>把一个想法拆成 3 个能验证的功能</span></li>
-                <li><span>19:15</span><span>结对开发：写、读、改，每一步都看懂</span></li>
-                <li><span>20:10</span><span>部署上线 + 1 分钟展示</span></li>
+                <li><span>18:30</span><span data-en="What vibe coding can and can't do, in 5 minutes">5 分钟讲清楚 Vibe Coding 能做什么、不能做什么</span></li>
+                <li><span>18:45</span><span data-en="Break an idea into 3 testable features">把一个想法拆成 3 个能验证的功能</span></li>
+                <li><span>19:15</span><span data-en="Pair up: write, read, fix — understand every step">结对开发：写、读、改，每一步都看懂</span></li>
+                <li><span>20:10</span><span data-en="Deploy + 1-minute demo">部署上线 + 1 分钟展示</span></li>
               </ul>
             </div>
           </div>
@@ -1039,13 +1359,42 @@ body{text-rendering:optimizeLegibility}
   <section class="sec">
     <div class="wrap">
       <div class="sec-head">
-        <div><div class="eyebrow mono">为什么来这里</div>
-        <h2 class="h2">做项目这件事，<br><span class="dim">一个人很容易半途而废。</span></h2></div>
+        <div><div class="eyebrow mono" data-en="Why here">为什么来这里</div>
+        <h2 class="h2" data-en="Side projects<br><span class=&quot;dim&quot;>die when you build alone.</span>">做项目这件事，<br><span class="dim">一个人很容易半途而废。</span></h2></div>
       </div>
       <div class="pillars">
-        <div class="pillar"><span class="glyph">中/EN</span><h3>用中文也能问</h3><p class="mute">讲解和答疑用中文，README、Demo 和 pitch 用英文。作品能直接放进简历和 LinkedIn。</p></div>
-        <div class="pillar"><span class="glyph">[WED]</span><h3>每周固定见面</h3><p class="mute">Build Night 每周同一时间、同一地点。线上先抛问题，线下一起写代码，进度不再靠自觉。</p></div>
-        <div class="pillar"><span class="glyph">→ DEMO</span><h3>做出来有地方展示</h3><p class="mute">每个周期以 Demo Night 收尾，项目卡长期挂在项目广场，愿意的话推荐给 UNSW Founders 或整理成作品集。</p></div>
+        <div class="pillar"><span class="glyph">中/EN</span><h3 data-en="Ask in Chinese">用中文也能问</h3><p class="mute" data-en="Explanations and Q&amp;A in Chinese; README, demo and pitch in English — ready for your CV and LinkedIn.">讲解和答疑用中文，README、Demo 和 pitch 用英文。作品能直接放进简历和 LinkedIn。</p></div>
+        <div class="pillar"><span class="glyph">[WED]</span><h3 data-en="Same time every week">每周固定见面</h3><p class="mute" data-en="Build Night: same time, same place. Post blockers online, write code together in person — progress no longer depends on willpower.">Build Night 每周同一时间、同一地点。线上先抛问题，线下一起写代码，进度不再靠自觉。</p></div>
+        <div class="pillar"><span class="glyph">→ DEMO</span><h3 data-en="Somewhere to show it">做出来有地方展示</h3><p class="mute" data-en="Every cycle ends with Demo Night. Project cards stay on the plaza, and can be referred to UNSW Founders or turned into a portfolio.">每个周期以 Demo Night 收尾，项目卡长期挂在项目广场，愿意的话推荐给 UNSW Founders 或整理成作品集。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- two pieces: the logo is how teams form -->
+  <section class="sec pieces-sec">
+    <div class="wrap">
+      <div class="sec-head">
+        <div><div class="eyebrow mono" data-en="Two pieces · one team">拼在一起 / Two pieces</div>
+        <h2 class="h2" data-en="One piece brings the idea,<br><span class=&quot;dim&quot;>the other builds it.</span>">一块是想法，<br><span class="dim">一块是动手的人。</span></h2></div>
+        <p class="lede" data-en="Our logo is how teams form here: someone with a problem worth solving, and someone who wants to build, snapped together at Build Night.">我们的 logo 就是组队方式：有问题想解决的人，和想把东西做出来的人，在 Build Night 拼成一个团队。</p>
+      </div>
+      <div class="pieces" id="pieces">
+        <article class="piece light">
+          <div class="piece-face" aria-hidden="true"><i></i><i></i></div>
+          <span class="mono piece-k">01 · The idea piece</span>
+          <h3 data-en="I have an idea">我有一个想法</h3>
+          <p data-en="Business, design, any degree. You know where users hurt — you need someone to build it.">商科、设计、任何专业。你知道用户痛在哪里，缺一个能把它做出来的人。</p>
+          <ul class="piece-list"><li data-en="90-second pitch">90 秒 Pitch</li><li data-en="List the roles you need">写清楚缺什么角色</li><li data-en="Bring real users to test">带用户来试用</li></ul>
+          <a href="#join" class="piece-cta"><span data-en="Submit a project card">提交项目卡</span> <span class="arr">→</span></a>
+        </article>
+        <article class="piece dark">
+          <div class="piece-face" aria-hidden="true"><i></i><i></i></div>
+          <span class="mono piece-k">02 · The build piece</span>
+          <h3 data-en="I want to build">我想动手做</h3>
+          <p data-en="CS, IT, data — or you just wrote your first line of code. You want a real problem to practise on.">CS、IT、数据，或者刚学会写第一行代码。你想要一个真实的问题来练手。</p>
+          <ul class="piece-list"><li data-en="Pick a project to join">挑一个项目加入</li><li data-en="Build together every Wednesday">每周三一起写</li><li data-en="Present at Demo Night">Demo Night 上台</li></ul>
+          <a href="#projects" class="piece-cta"><span data-en="See who's recruiting">看谁在招人</span> <span class="arr">→</span></a>
+        </article>
       </div>
     </div>
   </section>
@@ -1055,15 +1404,15 @@ body{text-rendering:optimizeLegibility}
     <div class="wrap">
       <div class="sec-head">
         <div><div class="eyebrow mono">Build Cycle 01 · W3 – W6</div>
-        <h2 class="h2">4–6 周，<span class="dim">从一个想法到一次演示。</span></h2></div>
-        <p class="lede">每个周期公开每个项目“缺什么人”。商科、设计同学和开发者在第一周配对，工具额度优先给有进展的项目。</p>
+        <h2 class="h2" data-en="4–6 weeks,<span class=&quot;dim&quot;> from an idea to a demo.</span>">4–6 周，<span class="dim">从一个想法到一次演示。</span></h2></div>
+        <p class="lede" data-en="Each cycle, every project lists the roles it needs. Business, design and dev students pair up in week one; tool credits go to projects that are moving.">每个周期公开每个项目“缺什么人”。商科、设计同学和开发者在第一周配对，工具额度优先给有进展的项目。</p>
       </div>
       <div class="cycle" id="cycle">
         <div class="cycle-rail"><i></i></div>
-        <div class="step done"><div class="node">01</div><h3>组队 Pitch</h3><p>每人 90 秒讲想法，现场按“缺的角色”配对。</p><span class="mono">W3 · 10/28</span></div>
-        <div class="step now"><div class="node">02</div><h3>每周 Build Night</h3><p>线上周一抛问题，线下周三一起写。每两周在项目卡上更新一次进展。</p><span class="mono">W3 – W6</span></div>
-        <div class="step"><div class="node">03</div><h3>中期检查</h3><p>跑通一个核心流程，卡住的项目一对一回访。</p><span class="mono">W4 · 11/8</span></div>
-        <div class="step"><div class="node">04</div><h3>Demo Night</h3><p>3 分钟英文演示 + 现场试用 + 同伴反馈。</p><span class="mono">W6 · 11/18</span></div>
+        <div class="step done"><div class="node">01</div><h3 data-en="Team pitch">组队 Pitch</h3><p data-en="90 seconds per idea; pair up live by missing role.">每人 90 秒讲想法，现场按“缺的角色”配对。</p><span class="mono">W3 · 10/28</span></div>
+        <div class="step now"><div class="node">02</div><h3 data-en="Weekly Build Night">每周 Build Night</h3><p data-en="Post blockers Monday, build together Wednesday. Update your project card every two weeks.">线上周一抛问题，线下周三一起写。每两周在项目卡上更新一次进展。</p><span class="mono">W3 – W6</span></div>
+        <div class="step"><div class="node">03</div><h3 data-en="Mid-cycle check">中期检查</h3><p data-en="Get one core flow working; stuck teams get a 1:1.">跑通一个核心流程，卡住的项目一对一回访。</p><span class="mono">W4 · 11/8</span></div>
+        <div class="step"><div class="node">04</div><h3>Demo Night</h3><p data-en="3-minute English demo + live try-out + peer feedback.">3 分钟英文演示 + 现场试用 + 同伴反馈。</p><span class="mono">W6 · 11/18</span></div>
       </div>
     </div>
   </section>
@@ -1072,20 +1421,20 @@ body{text-rendering:optimizeLegibility}
   <section class="sec">
     <div class="wrap">
       <div class="sec-head">
-        <div><div class="eyebrow mono">公开数据 · 每两周更新</div>
-        <h2 class="h2">我们只看一个数：<br><span class="dim">有多少项目在动。</span></h2></div>
-        <span class="tag dash">演示数据，非真实统计</span>
+        <div><div class="eyebrow mono" data-en="Open numbers · updated fortnightly">公开数据 · 每两周更新</div>
+        <h2 class="h2" data-en="We track one number:<br><span class=&quot;dim&quot;>how many projects are moving.</span>">我们只看一个数：<br><span class="dim">有多少项目在动。</span></h2></div>
+        <span class="tag dash" data-en="Demo data, not real stats">演示数据，非真实统计</span>
       </div>
       <div class="metrics">
         <div class="metric star">
-          <span class="mono mute">北极星 · 双周活跃项目</span>
+          <span class="mono mute" data-en="North star · active projects / 2 wks">北极星 · 双周活跃项目</span>
           <div class="big"><span data-count="5">0</span><sup>/ 8</sup></div>
-          <p class="mute" style="font-size:13px">过去 14 天有代码提交、Demo 或更新帖的成员项目</p>
+          <p class="mute" style="font-size:13px" data-en="Member projects with a commit, demo or update in the last 14 days">过去 14 天有代码提交、Demo 或更新帖的成员项目</p>
           <svg class="spark" viewBox="0 0 200 46" preserveAspectRatio="none" aria-hidden="true"><polyline id="sparkline" fill="none" stroke="currentColor" stroke-width="2" points="0,44 40,40 80,32 120,30 160,18 200,12"/><circle cx="200" cy="12" r="4" fill="currentColor"/></svg>
         </div>
-        <div class="metric"><span class="mono mute">群成员</span><div class="big"><span data-count="86">0</span></div><span class="mono mute">目标 150</span><div class="bar"><i data-w="57"></i></div></div>
-        <div class="metric"><span class="mono mute">累计到场</span><div class="big"><span data-count="34">0</span></div><span class="mono mute">目标 60</span><div class="bar"><i data-w="57"></i></div></div>
-        <div class="metric"><span class="mono mute">两周内再来</span><div class="big"><span data-count="35">0</span><sup>%</sup></div><span class="mono mute">假设值，W2 后校准</span><div class="bar"><i data-w="35"></i></div></div>
+        <div class="metric"><span class="mono mute" data-en="Members">群成员</span><div class="big"><span data-count="86">0</span></div><span class="mono mute" data-en="Goal 150">目标 150</span><div class="bar"><i data-w="57"></i></div></div>
+        <div class="metric"><span class="mono mute" data-en="Total attendance">累计到场</span><div class="big"><span data-count="34">0</span></div><span class="mono mute" data-en="Goal 60">目标 60</span><div class="bar"><i data-w="57"></i></div></div>
+        <div class="metric"><span class="mono mute" data-en="Back within 2 wks">两周内再来</span><div class="big"><span data-count="35">0</span><sup>%</sup></div><span class="mono mute" data-en="Assumed · calibrate after W2">假设值，W2 后校准</span><div class="bar"><i data-w="35"></i></div></div>
       </div>
     </div>
   </section>
@@ -1094,9 +1443,9 @@ body{text-rendering:optimizeLegibility}
   <section class="sec">
     <div class="wrap">
       <div class="sec-head">
-        <div><div class="eyebrow mono">精选项目</div>
-        <h2 class="h2">正在做的东西。</h2></div>
-        <a href="#projects" class="btn ghost" style="--h:40px">进入项目广场 <span class="arr">→</span></a>
+        <div><div class="eyebrow mono" data-en="Featured projects">精选项目</div>
+        <h2 class="h2" data-en="Things being built.">正在做的东西。</h2></div>
+        <a href="#projects" class="btn ghost" style="--h:40px"><span data-en="Open the plaza">进入项目广场</span> <span class="arr">→</span></a>
       </div>
       <div class="grid-p" id="featured"></div>
     </div>
@@ -1108,9 +1457,10 @@ body{text-rendering:optimizeLegibility}
   <section class="sec" style="border-top:0">
     <div class="wrap">
       <div class="page-head">
+        <div class="ph-bar mono" aria-hidden="true"><span class="ph-path"><span class="mute">~/builderspace/</span><b>events</b></span><span class="ph-rule"><i></i></span><span class="ph-idx"><b>02</b> / 06</span></div>
         <div style="min-width:0">
           <div class="eyebrow mono">活动 / Events · T3 2026</div>
-          <h1 class="display page-title"><span class="line"><span>Every week,</span></span><span class="line"><span class="outline">same time.</span></span></h1>
+          <h1 class="display page-title"><span class="line"><span class="ttl-a">Every week,</span></span><span class="line"><span class="outline lit">same time.</span></span></h1>
         </div>
         <dl class="page-aside">
           <div><dt class="mono mute">下一场</dt><dd>10/21 · 18:30</dd></div>
@@ -1189,9 +1539,10 @@ body{text-rendering:optimizeLegibility}
   <section class="sec" style="border-top:0">
     <div class="wrap">
       <div class="page-head">
+        <div class="ph-bar mono" aria-hidden="true"><span class="ph-path"><span class="mute">~/builderspace/</span><b>projects</b></span><span class="ph-rule"><i></i></span><span class="ph-idx"><b>03</b> / 06</span></div>
         <div style="min-width:0">
           <div class="eyebrow mono">项目广场 / Project Plaza · Cycle 01</div>
-          <h1 class="display page-title"><span class="line"><span>Find a team.</span></span><span class="line"><span class="outline">Ship a thing.</span></span></h1>
+          <h1 class="display page-title"><span class="line"><span class="ttl-a">Find a team.</span></span><span class="line"><span class="outline lit">Ship a thing.</span></span></h1>
         </div>
         <dl class="page-aside">
           <div><dt class="mono mute">公开项目</dt><dd id="stTotal">6</dd></div>
@@ -1318,9 +1669,10 @@ body{text-rendering:optimizeLegibility}
   <section class="sec" style="border-top:0">
     <div class="wrap">
       <div class="page-head">
+        <div class="ph-bar mono" aria-hidden="true"><span class="ph-path"><span class="mute">~/builderspace/</span><b>learn</b></span><span class="ph-rule"><i></i></span><span class="ph-idx"><b>04</b> / 06</span></div>
         <div style="min-width:0">
           <div class="eyebrow mono">教程资料 / Learn</div>
-          <h1 class="display page-title"><span class="line"><span>Write with AI.</span></span><span class="line"><span class="outline">Read every line.</span></span></h1>
+          <h1 class="display page-title"><span class="line"><span class="ttl-a">Write with AI.</span></span><span class="line"><span class="outline lit">Read every line.</span></span></h1>
         </div>
         <dl class="page-aside">
           <div><dt class="mono mute">工作坊</dt><dd>2 期</dd></div>
@@ -1405,9 +1757,10 @@ describe("项目卡", () =&gt; {
   <section class="sec" style="border-top:0">
     <div class="wrap">
       <div class="page-head">
+        <div class="ph-bar mono" aria-hidden="true"><span class="ph-path"><span class="mute">~/builderspace/</span><b>join</b></span><span class="ph-rule"><i></i></span><span class="ph-idx"><b>05</b> / 06</span></div>
         <div style="min-width:0">
           <div class="eyebrow mono">加入 / Join · 约 1 分钟</div>
-          <h1 class="display page-title"><span class="line"><span>Start</span></span><span class="line"><span class="outline">here.</span></span></h1>
+          <h1 class="display page-title"><span class="line"><span class="ttl-a">Start</span></span><span class="line"><span class="outline lit">here.</span></span></h1>
         </div>
         <dl class="page-aside">
           <div><dt class="mono mute">谁可以加入</dt><dd>UNSW 本科 / 硕士</dd></div>
@@ -1422,7 +1775,7 @@ describe("项目卡", () =&gt; {
             <div class="mcard" id="mcard">
               <div class="mc-face mc-front">
                 <div class="mc-holo" aria-hidden="true"></div>
-                <div class="mc-top"><span class="logo" style="font-size:13px"><span class="logo-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>BuilderSpace</span><span class="mono mute">Member · T3 2026</span></div>
+                <div class="mc-top"><span class="logo" style="font-size:13px"><img class="logo-mark" src="assets/mark-240.webp" alt="" width="36" height="23" decoding="async">BuilderSpace</span><span class="mono mute">Member · T3 2026</span></div>
                 <div class="mc-mid">
                   <b class="mc-name" id="mcName">Yuki</b>
                   <span class="mc-major" id="mcMajor">Information Technology</span>
@@ -1498,16 +1851,23 @@ describe("项目卡", () =&gt; {
 <section class="view" id="v-spec" data-view="spec">
   <section class="sec" style="border-top:0">
     <div class="wrap">
+      <div class="page-head ph-solo"><div class="ph-bar mono" aria-hidden="true"><span class="ph-path"><span class="mute">~/builderspace/</span><b>spec</b></span><span class="ph-rule"><i></i></span><span class="ph-idx"><b>06</b> / 06</span></div></div>
       <div class="eyebrow mono">设计说明 · 对应 PRD v0.5 第四节</div>
-      <h1 class="display" style="font-size:clamp(36px,7vw,92px)"><span class="line"><span>Black, white,</span></span><span class="line"><span class="outline">and a blueprint.</span></span></h1>
-      <p class="lede" style="margin-top:20px">视觉概念是“工作台图纸”：纯黑底、白色发丝线网格、等宽坐标标注。颜色只有黑白灰，状态靠形状区分（实心、空心、斜纹、灰），在微信内置浏览器和低亮度屏幕上也能一眼分辨。</p>
+      <h1 class="display page-title" style="font-size:clamp(36px,7vw,92px)"><span class="line"><span class="ttl-a">Black, white,</span></span><span class="line"><span class="outline lit">and a blueprint.</span></span></h1>
+      <p class="lede" style="margin-top:20px">视觉概念是“工作台图纸”：纯黑底、白色发丝线网格、等宽坐标标注，界面只用黑白灰和铬。整页唯一的颜色留给吉祥物本身——金色拼图只出现在 logo、首屏粒子和成员卡上，像产品图放在单色页面里。状态靠形状区分（实心、空心、斜纹、灰），科技感来自材质与光：微点阵、磨砂玻璃、指针边缘光、点阵粒子</p>
 
       <h2 class="h2" style="font-size:24px;margin:56px 0 20px">色彩 Token</h2>
       <div class="spec-grid">
-        <div class="sw"><div style="background:var(--ink);border-bottom:1px solid var(--line)"></div><p><b>--ink</b><span class="mono mute">#050505 · 页面底色</span></p></div>
-        <div class="sw"><div style="background:var(--panel);border-bottom:1px solid var(--line)"></div><p><b>--panel</b><span class="mono mute">#0C0C0D · 卡片</span></p></div>
-        <div class="sw"><div style="background:var(--mute)"></div><p><b>--mute</b><span class="mono mute">#8A8A90 · 次要文字</span></p></div>
-        <div class="sw"><div style="background:var(--paper)"></div><p><b>--paper</b><span class="mono mute">#F4F4F2 · 文字 / 反白</span></p></div>
+        <div class="sw"><div style="background:var(--ink);border-bottom:1px solid var(--line)"></div><p><b>--ink</b><span class="mono mute">#060709 · 石墨黑底色</span></p></div>
+        <div class="sw"><div style="background:var(--panel);border-bottom:1px solid var(--line)"></div><p><b>--panel</b><span class="mono mute">#0C0E11 · 卡片</span></p></div>
+        <div class="sw"><div style="background:var(--mute)"></div><p><b>--mute</b><span class="mono mute">#8B919C · 次要文字（冷灰）</span></p></div>
+        <div class="sw"><div style="background:var(--paper)"></div><p><b>--paper</b><span class="mono mute">#F3F2EE · 正文</span></p></div>
+      </div>
+      <div class="spec-grid mat-row">
+        <div class="sw"><div style="background:var(--mat-frost),var(--mat-micro),var(--panel);background-size:auto,5px 5px,auto"></div><p><b>--mat-frost + micro</b><span class="mono mute">磨砂玻璃 · 5px 微点阵 · 面板</span></p></div>
+        <div class="sw"><div style="background:var(--mat-porcelain)"></div><p><b>--mat-porcelain</b><span class="mono mute">白瓷 · 浅色拼图</span></p></div>
+        <div class="sw"><div style="background:var(--mat-obsidian);box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)"></div><p><b>--mat-obsidian</b><span class="mono mute">黑曜石 · 深色拼图 / 成员卡</span></p></div>
+        <div class="sw"><div style="background:url(assets/mark-240.webp) center/70% auto no-repeat,var(--ink)"></div><p><b>mascot</b><span class="mono mute">唯一的颜色 · logo 原色</span></p></div>
       </div>
 
       <h2 class="h2" style="font-size:24px;margin:56px 0 20px">字体</h2>
@@ -1515,14 +1875,14 @@ describe("项目卡", () =&gt; {
         <thead><tr><th>角色</th><th>字体</th><th>用在哪里</th><th>样例</th></tr></thead>
         <tbody>
           <tr><td>Display</td><td>Unbounded 800 / 600</td><td>英文大标题、数字、日期</td><td style="font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:-.04em">Ship a thing. 08</td></tr>
-          <tr><td>Body</td><td>Instrument Sans + Noto Sans SC</td><td>正文、表单、按钮</td><td>带着想法来，两小时做出第一个能用的页面。</td></tr>
-          <tr><td>Utility</td><td>JetBrains Mono</td><td>标签、坐标、周次、代码</td><td class="mono">W3 · 10/28 · CYCLE 01</td></tr>
+          <tr><td>Body</td><td>Geist + Noto Sans SC</td><td>正文、表单、按钮</td><td>带着想法来，两小时做出第一个能用的页面。</td></tr>
+          <tr><td>Utility</td><td>Geist Mono</td><td>标签、坐标、周次、代码</td><td class="mono">W3 · 10/28 · CYCLE 01</td></tr>
         </tbody>
       </table></div>
 
       <h2 class="h2" style="font-size:24px;margin:56px 0 20px">动效</h2>
       <div class="motion">
-        <div class="mbox"><span class="mono mute">01 · 首屏</span><b>液态金属 + 1-bit 抖动</b><p class="mute" style="font-size:13px">WebGL 光线步进出几颗融合的金属球，一颗跟随指针；Bayer 8×8 抖动把它压成纯黑白网点，可切换回镜面铬。</p><div class="demo-stage"><span data-scramble style="font-family:var(--f-display);font-weight:600">BUILD NIGHT</span></div></div>
+        <div class="mbox"><span class="mono mute">01 · 首屏 + 页尾</span><b>液态金属 1-bit 抖动 · 页尾粒子吉祥物</b><p class="mute" style="font-size:13px">首屏保留光线步进金属球 + Bayer 8×8 抖动。每一页滚到页尾，1.76 万个取自 logo 的粒子聚合成吉祥物，背后的 BUILDERSPACE 字标随指针变粗；页尾顶部是随页面变化的“下一页”。</p><div class="demo-stage"><span data-scramble style="font-family:var(--f-display);font-weight:600">BUILD NIGHT</span></div></div>
         <div class="mbox"><span class="mono mute">02 · 反馈</span><b>反色填充</b><p class="mute" style="font-size:13px">按钮、活动行、卖点卡悬停时白色从一侧推入，文字反黑。只用黑白也有明确的状态变化。</p><div class="demo-stage"><a class="btn ghost" style="--h:36px" href="#spec">Hover me</a></div></div>
         <div class="mbox"><span class="mono mute">03 · 数据</span><b>计数与进度</b><p class="mute" style="font-size:13px">指标数字从 0 滚动到当前值，进度条和 Build Cycle 轨道随之填充，强调“项目在动”。</p><div class="demo-stage"><span class="big" style="font-size:36px" data-count="8" data-loop>0</span></div></div>
       </div>
@@ -1552,6 +1912,10 @@ describe("项目卡", () =&gt; {
         <div class="mat"><div class="s" style="background-image:var(--mat-brushed),linear-gradient(160deg,#fff,#bdbdba)"></div><p><b>--mat-brushed</b><span class="mono mute">拉丝金属 · 北极星指标</span></p></div>
         <div class="mat"><div class="s" style="background:var(--mat-chrome);background-size:100% 220%;animation:chromeShift 4s ease-in-out infinite alternate"></div><p><b>--mat-chrome</b><span class="mono mute">镜面铬 · 标题字</span></p></div>
         <div class="mat"><div class="s" style="background:var(--mat-glass),var(--panel)"><div class="glass" style="position:absolute;inset:22px;border-radius:12px;border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(8px)"></div></div><p><b>--mat-glass</b><span class="mono mute">玻璃面板 · 卡片 / 表单</span></p></div>
+        <div class="mat"><div class="s" style="background:var(--mat-frost),var(--mat-micro);background-size:auto,5px 5px"></div><p><b>--mat-micro</b><span class="mono mute">5px 微点阵 · 面板底纹</span></p></div>
+        <div class="mat"><div class="s" style="background:var(--mat-porcelain)"></div><p><b>--mat-porcelain</b><span class="mono mute">白瓷 · 浅色拼图卡</span></p></div>
+        <div class="mat"><div class="s" style="background:var(--mat-holo),var(--mat-obsidian);background-size:220% 100%,auto;animation:holo 5s ease-in-out infinite alternate"></div><p><b>--mat-holo</b><span class="mono mute">薄膜干涉 · 只用在成员卡</span></p></div>
+        <div class="mat"><div class="s" style="display:grid;place-items:center"><img src="assets/mark-240.webp" alt="" width="150" height="96" style="animation:float 3s ease-in-out infinite"></div><p><b>assets/mark</b><span class="mono mute">logo 抠图 · 整页唯一的颜色</span></p></div>
         <div class="mat"><div class="s"><canvas id="ditherSw" width="96" height="44" style="width:100%;height:100%;image-rendering:pixelated;display:block"></canvas></div><p><b>shader · bayer 8×8</b><span class="mono mute">1-bit 抖动 · 首屏渲染</span></p></div>
         <div class="mat"><div class="s" style="display:grid;place-items:center"><pre class="ascii" id="asciiSw" style="font-size:6px" aria-hidden="true"></pre></div><p><b>ascii · .,-~:;=!*#$@</b><span class="mono mute">字符渲染 · 页脚</span></p></div>
       </div>
@@ -1560,7 +1924,8 @@ describe("项目卡", () =&gt; {
       <div class="tbl-wrap"><table>
         <thead><tr><th>资源</th><th>版本 / 来源</th><th>用途</th><th>降级方案</th></tr></thead>
         <tbody>
-          <tr><td>Three.js</td><td class="mono">r128 · cdnjs</td><td>首屏液态金属球：光线步进 + Bayer 抖动着色器，半分辨率渲染</td><td>加载失败时回退到 Canvas 2D 点阵</td></tr>
+          <tr><td>Three.js</td><td class="mono">r128 · cdnjs</td><td>首屏液态金属球（光线步进 + Bayer 抖动，半分辨率）；页尾吉祥物粒子（顶点着色器，只在可见时渲染）</td><td>首屏回退 Canvas 2D 点阵；舞台回退静态吉祥物图</td></tr>
+          <tr><td>品牌资源</td><td class="mono">assets/ · 由 logo 生成</td><td>透明底吉祥物（WebP 13 KB / 55 KB）、favicon、iOS 图标、分享图、粒子数据（17,561 点，183 KB）</td><td>PNG 备份</td></tr>
           <tr><td>GSAP + ScrollTrigger</td><td class="mono">3.12.5 · cdnjs</td><td>标题逐字入场、滚动显现、Build Cycle 轨道随滚动填充、磁吸按钮</td><td>无库时保留 CSS 入场动画</td></tr>
           <tr><td>Lenis</td><td class="mono">1.1.13 · unpkg</td><td>桌面端惯性平滑滚动</td><td>触屏和微信内置浏览器不启用</td></tr>
           <tr><td>Geist / Geist Mono</td><td class="mono">Google Fonts</td><td>正文与等宽标注，替换原 Instrument Sans / JetBrains Mono</td><td>系统无衬线 / 等宽字体</td></tr>
@@ -1584,31 +1949,73 @@ describe("项目卡", () =&gt; {
 </section>
 </main>
 
-<footer>
+<footer class="foot2">
+  <!-- next page: changes with the route -->
+  <a class="foot-next" id="footNext" href="#events">
+    <span class="wrap fn-in">
+      <span class="fn-meta mono"><span class="mute" data-en="Next page">下一页 / Next</span><span class="mute" id="fnIdx">01 → 02</span></span>
+      <span class="fn-row">
+        <span class="fn-title"><span class="fn-roll"><span id="fnT1">Events</span><span id="fnT2" aria-hidden="true">Events</span></span></span>
+        <span class="fn-go" aria-hidden="true">→</span>
+      </span>
+      <span class="fn-sub" id="fnSub">活动 · 每周同一时间</span>
+    </span>
+  </a>
+
+  <!-- mascot stage: particles assemble as you reach the end of any page -->
+  <section class="stage" id="stage" aria-label="BuilderSpace 吉祥物">
+    <canvas id="mascot" aria-hidden="true"></canvas>
+    <img class="stage-mark" src="assets/mark-720.webp" alt="BuilderSpace 吉祥物：一金一黑两块拼图" width="720" height="463">
+    <div class="stage-frame" id="stageFrame" aria-hidden="true">
+      <span class="c tl"></span><span class="c tr"></span><span class="c bl"></span><span class="c br"></span>
+      <span class="sf-l mono">BS-MASCOT · 02 PIECES</span><span class="sf-r mono" id="stCount">0 / 17,561</span>
+      <i class="sf-x"></i><i class="sf-y"></i>
+    </div>
+    <div class="wordmark" id="wordmark" aria-hidden="true"><span>B</span><span>U</span><span>I</span><span>L</span><span>D</span><span>E</span><span>R</span><span>S</span><span>P</span><span>A</span><span>C</span><span>E</span></div>
+    <div class="wrap stage-in">
+      <div class="stage-top">
+        <div class="stage-cap-wrap">
+          <div class="eyebrow mono" style="margin:0" data-en="Two pieces · one build">两块拼图 / Two pieces</div>
+          <p class="mute stage-cap" data-en="Every dot is sampled from the logo. Get close and they shy away; click and they blink.">每一个点都取自 logo 原图。靠近它们会躲开，点一下会眨眼。</p>
+        </div>
+        <div class="stage-ctl">
+          <span class="mono mute" aria-hidden="true">PTS <b id="stPts">17,561</b> · FPS <b id="stFps">--</b></span>
+          <div class="rmode smode" role="group" aria-label="粒子渲染模式">
+            <button type="button" class="on" data-pm="0">Particles</button>
+            <button type="button" data-pm="1">Matrix</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <div class="wrap">
     <div class="foot">
-      <div><a href="#home" class="logo" style="color:var(--paper);padding:0"><span class="logo-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>BuilderSpace</a>
-        <p class="mute" style="font-size:13.5px;margin-top:14px;max-width:36ch">学生自发组织的中英双语创客社群，目前尚未附属 Arc。</p></div>
-      <div><h4 class="mono mute">逛逛</h4><a href="#events">活动</a><a href="#projects">项目广场</a><a href="#learn">教程资料</a></div>
-      <div><h4 class="mono mute">参与</h4><a href="#join">加入</a><a href="#join">提交项目卡</a><a href="#events">订阅日历</a></div>
-      <div><h4 class="mono mute">关注</h4><a href="#home">小红书</a><a href="#home">Instagram</a><a href="#home">Discord</a></div>
+      <div><a href="#home" class="logo" style="color:var(--paper);padding:0"><img class="logo-mark" src="assets/mark-240.webp" alt="" width="36" height="23" decoding="async">BuilderSpace</a>
+        <p class="mute" style="font-size:13.5px;margin-top:14px;max-width:36ch" data-en="A student-run bilingual maker community, not yet affiliated with Arc.">学生自发组织的中英双语创客社群，目前尚未附属 Arc。</p>
+        <div class="foot-ascii2"><pre class="ascii" id="ascii" aria-hidden="true"></pre><span class="mono mute">render · ascii</span></div></div>
+      <div><h4 class="mono mute" data-en="Explore">逛逛</h4><a href="#events" data-en="Events">活动</a><a href="#projects" data-en="Projects">项目广场</a><a href="#learn" data-en="Learn">教程资料</a></div>
+      <div><h4 class="mono mute" data-en="Take part">参与</h4><a href="#join" data-en="Join">加入</a><a href="#join" data-en="Submit a project">提交项目卡</a><a href="#events" data-en="Subscribe to calendar">订阅日历</a></div>
+      <div><h4 class="mono mute" data-en="Follow">关注</h4><a href="#home" data-en="Xiaohongshu">小红书</a><a href="#home">Instagram</a><a href="#home">Discord</a></div>
     </div>
-    <div class="foot-ascii">
-      <div class="giant" aria-hidden="true" style="margin-top:0">BUILDER<br>SPACE</div>
-      <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
-        <pre class="ascii" id="ascii" aria-hidden="true"></pre>
-        <span class="mono mute">render · ascii · 60fps</span>
-      </div>
+    <div class="foot-bar mono">
+      <span>© 2026 BuilderSpace · Sydney</span>
+      <span class="fb-clock">SYD <b id="fbSyd">--:--:--</b> · BJ <b id="fbBj">--:--</b></span>
+      <span class="fb-status"><i></i><span data-en="Build Night: Wednesdays 18:30">Build Night 每周三 18:30</span></span>
+      <button class="totop" type="button" id="toTop" aria-label="回到顶部">
+        <svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="20" class="tt-bg"/><circle cx="22" cy="22" r="20" class="tt-fg" id="ttRing"/></svg>
+        <span aria-hidden="true">↑</span>
+      </button>
     </div>
   </div>
 </footer>
 
 <nav class="dock" aria-label="底部导航">
-  <a href="#home" data-r="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11 12 4l9 7v9H3z"/></svg>首页</a>
-  <a href="#events" data-r="events"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>活动</a>
-  <a href="#projects" data-r="projects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>项目</a>
-  <a href="#learn" data-r="learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m8 8-5 4 5 4M16 8l5 4-5 4M14 4l-4 16"/></svg>教程</a>
-  <a href="#join" data-r="join"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"/></svg>加入</a>
+  <a href="#home" data-r="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11 12 4l9 7v9H3z"/></svg><span data-en="Home">首页</span></a>
+  <a href="#events" data-r="events"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span data-en="Events">活动</span></a>
+  <a href="#projects" data-r="projects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg><span data-en="Projects">项目</span></a>
+  <a href="#learn" data-r="learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m8 8-5 4 5 4M16 8l5 4-5 4M14 4l-4 16"/></svg><span data-en="Learn">教程</span></a>
+  <a href="#join" data-r="join"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"/></svg><span data-en="Join">加入</span></a>
 </nav>
 <div class="xy mono" id="xy" aria-hidden="true">X 0000 · Y 0000</div>
 
@@ -1725,8 +2132,8 @@ void main(){
     const r = hero.getBoundingClientRect();
     target.set((e.clientX - r.left) / r.width, 1 - (e.clientY - r.top) / r.height);
   });
-  document.querySelectorAll('.rmode button').forEach(b => b.addEventListener('click', () => {
-    document.querySelectorAll('.rmode button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.readout .rmode button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.readout .rmode button').forEach(x => x.classList.toggle('on', x === b));
     const to = +b.dataset.mode;
     if (window.gsap) gsap.to(U.uDither, { value: to, duration: .8, ease: 'power2.inOut' }); else U.uDither.value = to;
   }));
@@ -1749,6 +2156,233 @@ void main(){
     U.uMouse.value.lerp(target, .06);
     U.uScroll.value = Math.min(1, scrollY / innerHeight);
     renderer.render(scene, camera);
+    frames++;
+    if (now - fpsT > 500) { if (fpsEl) fpsEl.textContent = Math.round(frames * 1000 / (now - fpsT)); frames = 0; fpsT = now; }
+  };
+  requestAnimationFrame(loop);
+})();
+</script>
+<script>
+/* =====================================================================
+   STAGE · Three.js 粒子吉祥物
+   1.76 万个粒子取自 logo 原图（位置 + 原色），全部运动在顶点着色器里算：
+   随滚动聚合 / 离开时散开 / 果冻呼吸 / 眨眼 / 指针排斥 / 点击涟漪 / Matrix 点阵。CPU 每帧只更新 uniform。
+   ===================================================================== */
+(() => {
+  const canvas = document.getElementById('mascot');
+  const stage = document.getElementById('stage');
+  const D = window.BS_MASCOT;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!window.THREE || !canvas || !D) { canvas && canvas.remove(); return; }
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: true, powerPreference: 'high-performance' }); }
+  catch (e) { canvas.remove(); return; }
+  renderer.setClearColor(0x000000, 0);
+  stage.classList.add('pm-on');
+
+  /* ---------- decode particle data: int16 x, int16 y, rgb, kind ---------- */
+  const mobile = matchMedia('(max-width:720px)').matches;
+  const bytes = Uint8Array.from(atob(D.data), c => c.charCodeAt(0));
+  const dv = new DataView(bytes.buffer);
+  const n = D.n, DUST = mobile ? 420 : 1000, N = n + DUST;
+  const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), kind = new Float32Array(N), rnd = new Float32Array(N * 4), scat = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < 4; j++) rnd[i * 4 + j] = Math.random();
+    const a = Math.random() * Math.PI * 2, r = .35 + Math.sqrt(Math.random()) * 1.5;
+    scat[i * 3] = Math.cos(a) * r * 1.35; scat[i * 3 + 1] = Math.sin(a) * r * .85; scat[i * 3 + 2] = (Math.random() - .5) * .8;
+    if (i < n) {
+      const o = i * 8, R = dv.getUint8(o + 4) / 255, G = dv.getUint8(o + 5) / 255, B = dv.getUint8(o + 6) / 255;
+      pos[i * 3] = dv.getInt16(o, true) / 16000;
+      pos[i * 3 + 1] = dv.getInt16(o + 2, true) / 16000;
+      pos[i * 3 + 2] = ((R + G + B) / 3 - .45) * .22;          // 亮处向前凸，保留原图的果冻高光体积
+      col[i * 3] = R; col[i * 3 + 1] = G; col[i * 3 + 2] = B;
+      kind[i] = dv.getUint8(o + 7);
+    } else {
+      pos[i * 3] = (Math.random() - .5) * 5.4; pos[i * 3 + 1] = (Math.random() - .5) * 2.4; pos[i * 3 + 2] = -.2 - Math.random() * .4;
+      kind[i] = 20;
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('aKind', new THREE.BufferAttribute(kind, 1));
+  geo.setAttribute('aRnd', new THREE.BufferAttribute(rnd, 4));
+  geo.setAttribute('aScatter', new THREE.BufferAttribute(scat, 3));
+
+  const U = {
+    uTime: { value: 0 }, uForm: { value: reduce ? 1 : 0 }, uBlink: { value: 0 }, uScroll: { value: 0 },
+    uScale: { value: .6 }, uCenter: { value: new THREE.Vector2(.6, 0) }, uPxW: { value: 400 },
+    uMouse: { value: new THREE.Vector2(9, 9) }, uTilt: { value: new THREE.Vector2() },
+    uPulseAt: { value: new THREE.Vector2() }, uPulseT: { value: 99 },
+    uMatrix: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) }, uCell: { value: 7 },
+    uEyes: { value: D.eyes.map(e => new THREE.Vector3(e[0], e[1], e[2])) }
+  };
+  const vert = `
+attribute vec3 aColor; attribute float aKind; attribute vec4 aRnd; attribute vec3 aScatter;
+uniform float uTime, uForm, uBlink, uScroll, uScale, uPxW, uPulseT, uMatrix, uCell;
+uniform vec2 uRes;
+uniform vec2 uCenter, uMouse, uTilt, uPulseAt;
+uniform vec3 uEyes[4];
+varying vec3 vColor; varying float vAlpha; varying float vSq;
+float q2y(float wy, float cy, float sc){ return (wy - cy) / sc; }
+void main(){
+  vec3 p = position; float k = aKind, t = uTime, a = 1., sz = .0098;
+  bool dust = k > 19.5;
+  if (k > 9.5 && !dust) {
+    float ei = k - 10.;
+    vec3 e = ei < .5 ? uEyes[0] : ei < 1.5 ? uEyes[1] : ei < 2.5 ? uEyes[2] : uEyes[3];
+    if (ei < 1.5) { a = step((e.y + e.z - p.y) / (2. * e.z), uBlink * 1.06); sz = .0052; }   // 金色眼睑从上往下合
+    else { p.y = e.y + (p.y - e.y) * (1. - uBlink * .9); sz = .0048; }                   // 奶油色眼睛压扁
+  } else if (k > 1.5 && k < 2.5) sz = .0068;
+  float warm = step(.22, aColor.r - aColor.b);
+  float piece = (k < .5 || (k > 9.5 && k < 11.5)) ? 0. : ((k > .5 && k < 1.5) || (k > 11.5 && !dust)) ? 1. : 1. - warm;
+  // 果冻呼吸：两块拼图错相浮动
+  p.y += sin(t * 1.3 + piece * 2.2) * .016;
+  p.x += sin(t * .9 + piece * 2.2) * .005;
+  p.xy *= 1. + sin(t * 2.4 + p.y * 4. + piece * 1.7) * .005;
+  p.z += sin(p.x * 6. + t * 1.4) * .02;
+  vec3 w;
+  float f = 1.;
+  if (dust) {
+    w = p; w.x = mod(p.x + t * .015 * (.4 + aRnd.y) + 2.7, 5.4) - 2.7;
+    w.y += sin(t * .35 + aRnd.z * 6.283) * .06;
+    sz = .0035 + aRnd.w * .006;
+  } else {
+    f = smoothstep(aRnd.x * .45, aRnd.x * .45 + .55, uForm);
+    vec3 s = aScatter;
+    s.x += sin(t * .3 + aRnd.y * 6.283) * .08; s.y += cos(t * .25 + aRnd.z * 6.283) * .08;
+    vec3 q = mix(s, p, f);
+    float sw = sin(f * 3.14159) * (aRnd.y - .5) * .6;
+    q.xy += vec2(-q.y, q.x) * sw;
+    q.xy += q.z * uTilt;                                    // 跟随指针的轻微 3D 倾斜
+    w = vec3(q.xy * uScale + uCenter, q.z * uScale);
+    w.xy += aScatter.xy * uScroll * .55 * uScale;           // 滚动时散开
+  }
+  vec2 d = w.xy - uMouse; float r = length(d);
+  float push = exp(-r * r / (.05 * uScale * uScale)) * (dust ? .05 : .15) * uScale * uForm;
+  w.xy += d / max(r, 1e-3) * push;
+  float pr = length(w.xy - uPulseAt);
+  float wave = sin(pr * 20. / uScale - uPulseT * 13.) * exp(-uPulseT * 2.4) * exp(-pr * 2.2 / uScale) * .028 * uScale;
+  w.xy += (w.xy - uPulseAt) / max(pr, 1e-3) * wave;
+  vec4 clip = projectionMatrix * modelViewMatrix * vec4(w, 1.);
+  // Matrix 模式：吸附到屏幕点阵格，像 LED 点阵屏
+  vec2 ndc = clip.xy / clip.w, px = (ndc * .5 + .5) * uRes;
+  vec2 snapped = ((floor(px / uCell) + .5) * uCell / uRes) * 2. - 1.;
+  clip.xy = mix(ndc, snapped, uMatrix * (dust ? 0. : 1.)) * clip.w;
+  gl_Position = clip;
+  vSq = uMatrix;
+  // 全息扫描：一条亮带缓慢自下而上扫过
+  float scanY = mod(t * .32, 2.8) - 1.4;
+  float scan = dust ? 0. : exp(-pow((q2y(w.y, uCenter.y, uScale) - scanY) * 9., 2.)) * f;
+  float lum = dot(aColor, vec3(.333));
+  float sparkle = (!dust && lum > .8) ? pow(.5 + .5 * sin(t * (1.5 + 2. * aRnd.y) + aRnd.z * 40.), 14.) : 0.;
+  gl_PointSize = mix(sz * (dust ? 1. : uScale) * uPxW * (1. + sparkle * 1.4 + scan * .5 + push / (.15 * uScale) * .7), uCell * .74, uMatrix * (dust ? 0. : 1.));
+  vColor = dust ? vec3(.9, .91, .93) : aColor;
+  if (k > .5 && k < 1.5) vColor = max(vColor * 1.7, vec3(.06, .055, .05));   // 黑曜石那块提亮一点，让高光读得出来
+  vColor += sparkle * .5;
+  vColor = mix(vColor, vec3(1.), scan * .45);
+  float tw = .5 + .5 * sin(t * (1. + aRnd.y * 2.) + aRnd.z * 6.283);
+  vAlpha = a * (dust ? .32 * tw : 1.) * (1. - uScroll * .65) * mix(.25, 1., f);
+}`;
+  const frag = `
+varying vec3 vColor; varying float vAlpha; varying float vSq;
+void main(){
+  vec2 c = abs(gl_PointCoord - .5);
+  float r = length(gl_PointCoord - .5);
+  float sq = 1. - smoothstep(.36, .46, max(c.x, c.y));
+  float m = mix(smoothstep(.5, .3, r), sq, vSq);   // 边缘清晰的小圆点，读起来更精密
+  if (m * vAlpha < .01) discard;
+  gl_FragColor = vec4(vColor * m * vAlpha, m * vAlpha);
+}`;
+  const mat = new THREE.ShaderMaterial({ uniforms: U, vertexShader: vert, fragmentShader: frag, transparent: true, depthTest: false, depthWrite: false,
+    blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor });
+  const scene = new THREE.Scene();
+  scene.add(new THREE.Points(geo, mat));
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -10, 10);
+
+  /* ---------- layout: centred on the stage, HUD frame follows the mascot ---------- */
+  let PR = Math.min(2, devicePixelRatio || 1), W = 1, H = 1;
+  const frame = document.getElementById('stageFrame');
+  const layout = () => {
+    const r = canvas.getBoundingClientRect(); if (!r.width || !r.height) return false;
+    W = r.width; H = r.height;
+    renderer.setPixelRatio(PR); renderer.setSize(W, H, false);
+    const asp = W / H; camera.left = -asp; camera.right = asp; camera.updateProjectionMatrix();
+    const small = W <= 720;
+    const wm = small ? W * .86 : Math.min(W * .54, H * 1.05, 900);
+    const hm = wm * D.aspect, cx = W / 2, cy = small ? H * .36 : H * .44;
+    U.uScale.value = wm / H;
+    U.uCenter.value.set((cx - W / 2) * 2 / H, -(cy - H / 2) * 2 / H);
+    U.uPxW.value = H * PR / 2;
+    U.uRes.value.set(W * PR, H * PR); U.uCell.value = (small ? 6 : 8) * PR;
+    const pad = small ? 14 : 34;
+    Object.assign(frame.style, { left: cx - wm / 2 - pad + 'px', top: cy - hm / 2 - pad + 'px', width: wm + pad * 2 + 'px', height: hm + pad * 2 + 'px' });
+    return true;
+  };
+  const draw = () => renderer.render(scene, camera);
+  new ResizeObserver(() => { if (layout()) draw(); }).observe(canvas);
+  layout(); draw();
+  addEventListener('hashchange', () => { form = 0; stage.classList.remove('seen'); });
+
+  /* ---------- pointer: repel + tilt; click: ripple + blink ---------- */
+  const mTarget = new THREE.Vector2(9, 9), tTarget = new THREE.Vector2();
+  const toWorld = (e, v) => { const r = canvas.getBoundingClientRect(); v.set((e.clientX - r.left - r.width / 2) * 2 / r.height, -(e.clientY - r.top - r.height / 2) * 2 / r.height); return v; };
+  stage.addEventListener('pointermove', e => {
+    toWorld(e, mTarget);
+    tTarget.set((mTarget.x - U.uCenter.value.x) * -.12, (mTarget.y - U.uCenter.value.y) * -.12);
+  });
+  stage.addEventListener('pointerleave', () => { mTarget.set(9, 9); tTarget.set(0, 0); });
+  let blinkT = -1, blinkTwice = false, nextBlink = 2.2;
+  const blink = twice => { blinkT = 0; blinkTwice = twice; };
+  stage.addEventListener('pointerdown', e => {
+    if (e.target.closest('a, button')) return;
+    toWorld(e, U.uPulseAt.value); U.uPulseT.value = 0; blink(Math.random() < .5);
+  });
+  document.querySelectorAll('.smode button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.smode button').forEach(x => x.classList.toggle('on', x === b));
+    const to = +b.dataset.pm;
+    if (window.gsap) gsap.to(U.uMatrix, { value: to, duration: .6, ease: 'power2.inOut' }); else U.uMatrix.value = to;
+  }));
+
+  /* ---------- scroll drives the story: gather on the way in, scatter on the way out ---------- */
+  const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  let form = reduce ? 1 : 0, exit = 0;
+  const countEl = document.getElementById('stCount'), total = D.n.toLocaleString('en');
+  let shownCount = -1;
+
+  /* ---------- render loop: only while the stage is on screen ---------- */
+  let last = performance.now(), frames = 0, fpsT = last, slow = 0;
+  const fpsEl = document.getElementById('stFps');
+  const loop = now => {
+    requestAnimationFrame(loop);
+    const r = stage.getBoundingClientRect(), vh = innerHeight;
+    // 舞台在页尾，路由切换会改变它的位置，所以每帧直接量一次，不在视口附近就不画
+    if (document.hidden || r.bottom < -120 || r.top > vh + 120) { last = now; return; }
+    const raw = now - last; last = now;
+    const dt = Math.min(.05, raw / 1000);
+    if (raw > 24 && raw < 200) { if (++slow > 50 && PR > 1) { PR = Math.max(1, PR - .25); slow = 0; layout(); } } else slow = Math.max(0, slow - 1);
+    const fIn = reduce ? 1 : smooth(vh * .92, vh * .28, r.top);           // 页尾进场：舞台顶部从视口底升到上三分之一时聚合完成
+    const fOut = 0;
+    form += (fIn - form) * Math.min(1, dt * 4); exit += (fOut - exit) * Math.min(1, dt * 4);
+    U.uForm.value = form; U.uScroll.value = exit;
+    const c = Math.round(D.n * Math.min(1, form * 1.02) * (1 - exit));
+    if (c !== shownCount && countEl) { shownCount = c; countEl.textContent = c.toLocaleString('en') + ' / ' + total; }
+    stage.classList.toggle('formed', form > .92 && exit < .1);
+    if (form > .55) stage.classList.add('seen');
+    if (!reduce) {
+      U.uTime.value += dt;
+      if (U.uTime.value > nextBlink && blinkT < 0) { blink(Math.random() < .25); nextBlink = U.uTime.value + 2.6 + Math.random() * 3.6; }
+    }
+    if (blinkT >= 0) {
+      blinkT += dt;
+      const bump = c => Math.max(0, 1 - Math.abs(blinkT - c) / .085);
+      U.uBlink.value = Math.max(bump(.085), blinkTwice ? bump(.29) : 0);
+      if (blinkT > (blinkTwice ? .4 : .2)) { blinkT = -1; U.uBlink.value = 0; }
+    }
+    U.uPulseT.value += dt;
+    U.uMouse.value.lerp(mTarget, mTarget.x > 8 ? 1 : .14);
+    U.uTilt.value.lerp(tTarget, .06);
+    draw();
     frames++;
     if (now - fpsT > 500) { if (fpsEl) fpsEl.textContent = Math.round(frames * 1000 / (now - fpsT)); frames = 0; fpsT = now; }
   };
@@ -2037,7 +2671,7 @@ $$('[data-lang]').forEach(b => b.addEventListener('click', () => {
 
 /* ---------------- cursor coordinates ---------------- */
 const xy = $('#xy');
-addEventListener('pointermove', e => { xy.textContent = `X ${String(e.clientX).padStart(4, '0')} · Y ${String(Math.round(e.clientY + scrollY)).padStart(4, '0')}`; }, { passive: true });
+addEventListener('pointermove', e => { xy.textContent = `X ${String(Math.round(e.clientX)).padStart(4, '0')} · Y ${String(Math.round(e.clientY + scrollY)).padStart(4, '0')}`; }, { passive: true });
 })();
 </script>
 <script>
@@ -2058,7 +2692,7 @@ let seen = false;
 try { seen = sessionStorage.getItem('bs-boot') === '1'; sessionStorage.setItem('bs-boot', '1'); } catch (e) {}
 if (reduce || seen) boot.remove();
 else {
-  const LOG = ['mount  grid.blueprint', 'load   mat.noise / mat.scan / mat.halftone', 'load   mat.chrome / mat.glass', 'compile shader.dither.bayer8', 'fetch  cycle_01 · 6 projects', 'ready'];
+  const LOG = ['mount  grid.blueprint', 'load   mat.micro / mat.frost / mat.chrome / mat.holo', 'sample mascot · ' + (window.BS_MASCOT ? window.BS_MASCOT.n.toLocaleString('en') : '0') + ' particles', 'compile shader.dither.bayer8 · shader.points', 'fetch  cycle_01 · 6 projects', 'ready'];
   const num = $('#bootNum'), log = $('#bootLog');
   const t0 = performance.now(), dur = 1100;
   const tick = now => {
@@ -2106,6 +2740,7 @@ if (fine && !reduce) {
 let lenis = null;
 if (window.Lenis && fine && !reduce) {
   lenis = new Lenis({ lerp: .11, wheelMultiplier: 1, smoothWheel: true, syncTouch: false });
+  window.__lenis = lenis;
   if (hasGsap && window.ScrollTrigger) { lenis.on('scroll', ScrollTrigger.update); gsap.ticker.add(t => lenis.raf(t * 1000)); gsap.ticker.lagSmoothing(0); }
   else { const r = t => { lenis.raf(t); requestAnimationFrame(r); }; requestAnimationFrame(r); }
   addEventListener('hashchange', () => lenis.scrollTo(0, { immediate: true }));
@@ -2462,6 +3097,259 @@ function drawRealQR() {
 
 
 
+
+<script>
+/* =====================================================================
+   v5 · 品牌交互：双语切换（data-en，记住选择）/ 拼图合体 / 跟随指针的眼睛
+   ===================================================================== */
+(() => {
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- language: every [data-en] swaps with its Chinese original ---------- */
+const setLang = en => {
+  $$('[data-en]').forEach(el => {
+    if (el.dataset.zh === undefined) el.dataset.zh = el.innerHTML;
+    el.innerHTML = en ? el.dataset.en : el.dataset.zh;
+  });
+  try { localStorage.setItem('bs-lang', en ? 'en' : 'zh'); } catch (e) {}
+  requestAnimationFrame(() => dispatchEvent(new Event('resize')));   // 导航胶囊按新文字宽度重新定位
+};
+$$('[data-lang]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.lang === 'en')));
+try { if (localStorage.getItem('bs-lang') === 'en') $('[data-lang="en"]').click(); } catch (e) {}
+
+/* ---------- two pieces snap together as the section scrolls in ---------- */
+let snapTl = null;
+const setupPieces = () => {
+  if (snapTl) { snapTl.scrollTrigger && snapTl.scrollTrigger.kill(); snapTl.kill(); snapTl = null; }
+  const box = $('#pieces');
+  if (!box || reduce || !window.gsap || !window.ScrollTrigger || !$('#v-home').classList.contains('on')) return;
+  const vert = matchMedia('(max-width:720px)').matches;
+  const [g, d] = $$('.piece', box);
+  const pop = () => { box.classList.remove('snapped'); void box.offsetWidth; box.classList.add('snapped'); };
+  snapTl = gsap.timeline({ scrollTrigger: { trigger: box, start: 'top 88%', end: vert ? 'top 30%' : 'top 40%', scrub: .8, onLeave: pop } })
+    .fromTo(g, vert ? { y: -56, rotate: -3 } : { x: -80, rotate: -5 }, { x: 0, y: 0, rotate: 0, ease: 'power3.out' }, 0)
+    .fromTo(d, vert ? { y: 56, rotate: 3 } : { x: 80, rotate: 5 }, { x: 0, y: 0, rotate: 0, ease: 'power3.out' }, 0);
+};
+addEventListener('hashchange', () => setTimeout(setupPieces, 60));
+setupPieces();
+
+/* ---------- piece eyes look at the pointer ---------- */
+if (!reduce && matchMedia('(pointer: fine)').matches) {
+  const faces = $$('.piece-face');
+  let px = 0, py = 0, queued = false;
+  const look = () => {
+    queued = false;
+    faces.forEach(f => {
+      const r = f.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) return;
+      const dx = px - (r.left + r.width / 2), dy = py - (r.top + r.height / 2), k = Math.min(1, Math.hypot(dx, dy) / 300);
+      const a = Math.atan2(dy, dx);
+      f.style.setProperty('--lx', (Math.cos(a) * 6 * k).toFixed(1) + 'px');
+      f.style.setProperty('--ly', (Math.sin(a) * 5 * k).toFixed(1) + 'px');
+    });
+  };
+  addEventListener('pointermove', e => { px = e.clientX; py = e.clientY; if (!queued) { queued = true; requestAnimationFrame(look); } }, { passive: true });
+}
+})();
+</script>
+
+<script>
+/* =====================================================================
+   v6 · 光：卡片发丝边跟随指针点亮 / 指针周围的金色网格（每帧最多一次读写）
+   ===================================================================== */
+(() => {
+if (!matchMedia('(pointer: fine)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+const SPOT = '.next, .pcard, .box, .lcard, .form, .metrics, .pillars';
+const grid = document.querySelector('.gridspot');
+let x = 0, y = 0, tgt = null, cur = null, queued = false;
+const off = el => { el.style.setProperty('--mx', '-999px'); el.style.setProperty('--my', '-999px'); };
+const frame = () => {
+  queued = false;
+  const s = tgt && tgt.closest ? tgt.closest(SPOT) : null;
+  if (cur && cur !== s) off(cur);
+  cur = s;
+  if (s) { const r = s.getBoundingClientRect(); s.style.setProperty('--mx', x - r.left + 'px'); s.style.setProperty('--my', y - r.top + 'px'); }
+  if (grid) { grid.style.transform = `translate3d(${x - 260}px,${y - 260}px,0)`; grid.style.backgroundPosition = `${260 - x}px ${260 - y}px`; grid.classList.add('on'); }
+};
+addEventListener('pointermove', e => { x = e.clientX; y = e.clientY; tgt = e.target; if (!queued) { queued = true; requestAnimationFrame(frame); } }, { passive: true });
+document.documentElement.addEventListener('pointerleave', () => { grid && grid.classList.remove('on'); if (cur) { off(cur); cur = null; } });
+})();
+</script>
+
+<script>
+/* =====================================================================
+   v8 · 页尾：随页面变化的“下一页” / 可变字重字标 / 回到顶部进度环 / 双时区时钟
+   ===================================================================== */
+(() => {
+const $ = (s, r = document) => r.querySelector(s);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fine = matchMedia('(pointer: fine)').matches;
+
+/* ---------- next page: every page hands you to the next one ---------- */
+const NEXT = {
+  home:     ['events',   'Events',        '活动 · 每周同一时间见',       'Events · same time every week'],
+  events:   ['projects', 'Projects',      '项目广场 · 找队友，做东西',   'Project plaza · find a team, ship a thing'],
+  projects: ['learn',    'Learn',         '教程资料 · 用 AI 写，逐行读懂', 'Learn · write with AI, read every line'],
+  project:  ['projects', 'Back to plaza', '回到项目广场 · 看看其他项目', 'Project plaza · see what else is moving'],
+  learn:    ['join',     'Start here',    '加入 · 大约 1 分钟',          'Join · takes about a minute'],
+  join:     ['events',   'See you there', '活动 · 先来一场 Build Night', 'Events · come to a Build Night first'],
+  spec:     ['home',     'Back home',     '首页 · 回到开头',             'Home · back to the start']
+};
+const ORDER = ['home', 'events', 'projects', 'learn', 'join', 'spec'];
+const fn = $('#footNext');
+const setNext = () => {
+  const cur = location.hash.slice(1) in NEXT ? location.hash.slice(1) : 'home';
+  const [to, title, zh, en] = NEXT[cur];
+  fn.href = '#' + to;
+  $('#fnT1').textContent = $('#fnT2').textContent = title;
+  $('#fnSub').textContent = document.documentElement.lang === 'en' ? en : zh;
+  const a = ORDER.indexOf(cur === 'project' ? 'projects' : cur), b = ORDER.indexOf(to);
+  $('#fnIdx').textContent = String(a + 1).padStart(2, '0') + ' → ' + String(b + 1).padStart(2, '0');
+};
+addEventListener('hashchange', setNext);
+document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => setTimeout(setNext)));
+setNext();
+// the band's fill follows where the pointer entered (top or bottom)
+fn.addEventListener('pointerenter', e => { const r = fn.getBoundingClientRect(); fn.style.setProperty('--from', e.clientY - r.top < r.height / 2 ? '0%' : '100%'); });
+
+/* ---------- wordmark: letters swell toward the pointer (variable weight 200 → 900) ---------- */
+const wm = $('#wordmark'), letters = wm ? [...wm.children] : [];
+let px = -9999, py = -9999, wmOn = false, wmVisible = false, t0 = performance.now();
+const ks = letters.map(() => 0);
+const paintWM = now => {
+  if (!wmVisible) { wmOn = false; return; }
+  requestAnimationFrame(paintWM);
+  const t = (now - t0) / 1000;
+  const rects = letters.map(el => el.getBoundingClientRect());   // 先统一读，再统一写：每帧只排版一次
+  letters.forEach((el, i) => {
+    const r = rects[i], cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    let target;
+    if (px > -9000) target = Math.exp(-Math.pow(Math.hypot(px - cx, (py - cy) * .6) / 190, 2));
+    else target = reduce ? 0 : Math.pow(.5 + .5 * Math.sin(t * 1.4 - i * .55), 6);   // 无指针时：一道缓慢的波
+    ks[i] += (target - ks[i]) * .14;
+    if (Math.abs(ks[i] - (+el.dataset.k || 0)) > .004) { el.dataset.k = ks[i].toFixed(3); el.style.setProperty('--k', ks[i].toFixed(3)); }
+  });
+};
+if (wm) {
+  new IntersectionObserver(([en]) => { wmVisible = en.isIntersecting; if (wmVisible && !wmOn) { wmOn = true; requestAnimationFrame(paintWM); } }).observe(wm);
+  if (fine) {
+    const st = $('#stage');
+    st.addEventListener('pointermove', e => { px = e.clientX; py = e.clientY; }, { passive: true });
+    st.addEventListener('pointerleave', () => { px = py = -9999; });
+  }
+}
+
+/* ---------- back to top: ring fills with scroll progress ---------- */
+const ring = $('#ttRing'), C = 2 * Math.PI * 20;
+if (ring) { ring.style.strokeDasharray = C; ring.style.strokeDashoffset = C; }
+let q = false;
+const prog = () => { q = false; const max = document.documentElement.scrollHeight - innerHeight; ring && (ring.style.strokeDashoffset = C * (1 - (max > 0 ? Math.min(1, scrollY / max) : 0))); };
+addEventListener('scroll', () => { if (!q) { q = true; requestAnimationFrame(prog); } }, { passive: true });
+prog();
+$('#toTop').addEventListener('click', () => {
+  if (window.__lenis) window.__lenis.scrollTo(0, { duration: 1.6, easing: t => 1 - Math.pow(1 - t, 4) });
+  else scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+});
+
+/* ---------- clocks ---------- */
+const fmt = (tz, sec) => new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', second: sec ? '2-digit' : undefined, hour12: false }).format(new Date());
+const tick = () => { $('#fbSyd').textContent = fmt('Australia/Sydney', true); $('#fbBj').textContent = fmt('Asia/Shanghai', false); };
+tick(); setInterval(tick, 1000);
+})();
+</script>
+
+<script>
+/* v9 · 按钮箭头拆成两份，悬停时一出一进；导航栏滚动后变磨砂玻璃 */
+(() => {
+document.querySelectorAll('.btn .arr').forEach(a => {
+  const t = a.textContent.trim();
+  if (t === '↗') a.classList.add('diag');
+  a.innerHTML = `<b>${t}</b><b aria-hidden="true">${t}</b>`;
+});
+const top = document.querySelector('.top');
+let q = false;
+const sync = () => { q = false; top.classList.toggle('scrolled', scrollY > 24); };
+addEventListener('scroll', () => { if (!q) { q = true; requestAnimationFrame(sync); } }, { passive: true });
+addEventListener('hashchange', () => setTimeout(sync, 50));
+sync();
+})();
+</script>
+
+<script>
+/* =====================================================================
+   v10 · 页首交互：铬字逐字入场 / 描边字光束扫过并跟随指针 / 景深视差 / 读数解码
+   ===================================================================== */
+(() => {
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const fine = matchMedia('(pointer: fine)').matches;
+const G = window.gsap && !reduce;
+
+// split line 1 into letters once; each letter carries its own chrome so transforms never break the clip
+if (G) {
+  document.documentElement.classList.add('js-split');
+  $$('.ttl-a').forEach(el => { el.innerHTML = [...el.textContent].map(c => `<span class="c2">${c}</span>`).join(''); });
+}
+
+const GLYPH = '!<>-_\\/[]{}=+*^?#01';
+const decode = (el, delay) => {
+  const final = el.dataset.final || (el.dataset.final = el.textContent);
+  if (reduce) return;
+  let f = 0; const total = 22;
+  setTimeout(function step() {
+    el.textContent = [...final].map((ch, i) => (ch === ' ' || f / total > i / final.length) ? ch : GLYPH[(Math.random() * GLYPH.length) | 0]).join('');
+    if (++f <= total) requestAnimationFrame(step); else el.textContent = final;
+  }, delay);
+};
+
+let sweep = null;
+const enter = () => {
+  const v = $('.view.on'); if (!v) return;
+  const t = $('.page-title', v);
+  if (t && G) {
+    gsap.fromTo($$('.c2', t), { yPercent: 115, rotateX: -80, opacity: 0 },
+      { yPercent: 0, rotateX: 0, opacity: 1, duration: 1.15, ease: 'expo.out', stagger: .028, transformOrigin: '50% 100%', delay: .05 });
+    // a beam sweeps through the outline line, then hands over to the pointer
+    const lit = $('.lit', t);
+    if (lit) {
+      sweep && sweep.kill();
+      const o = { x: -260 }, w = lit.getBoundingClientRect().width;
+      lit.style.setProperty('--ly', '55%');
+      sweep = gsap.to(o, { x: w + 260, duration: 1.8, ease: 'power2.inOut', delay: .45, onUpdate: () => lit.style.setProperty('--lx', o.x + 'px'),
+        onComplete: () => lit.style.setProperty('--lx', '-999px') });
+    }
+  }
+  $$('.page-aside dd', v).forEach((dd, i) => decode(dd, 350 + i * 110));
+};
+addEventListener('hashchange', () => setTimeout(enter, 20));
+setTimeout(enter, 60);
+
+// pointer: depth parallax on the two lines + light follows the cursor across the outline
+if (fine && !reduce) {
+  let q = false, ev = null;
+  const frame = () => {
+    q = false;
+    const head = ev.target.closest && ev.target.closest('.page-head, .view.on .page-title');
+    $$('.view.on .page-title').forEach(t => {
+      const box = (t.closest('.page-head') || t).getBoundingClientRect();
+      const inside = ev.clientX >= box.left && ev.clientX <= box.right && ev.clientY >= box.top - 40 && ev.clientY <= box.bottom + 40;
+      t.style.setProperty('--px', inside ? ((ev.clientX - box.left) / box.width - .5).toFixed(3) : 0);
+      t.style.setProperty('--py', inside ? ((ev.clientY - box.top) / box.height - .5).toFixed(3) : 0);
+      const lit = $('.lit', t);
+      if (lit && !(sweep && sweep.isActive())) {
+        const r = lit.getBoundingClientRect();
+        const near = ev.clientY > r.top - 140 && ev.clientY < r.bottom + 140;
+        lit.style.setProperty('--lx', near ? ev.clientX - r.left + 'px' : '-999px');
+        lit.style.setProperty('--ly', near ? ev.clientY - r.top + 'px' : '-999px');
+      }
+    });
+  };
+  addEventListener('pointermove', e => { ev = e; if (!q) { q = true; requestAnimationFrame(frame); } }, { passive: true });
+}
+})();
+</script>
 
 </body>
 </html>
